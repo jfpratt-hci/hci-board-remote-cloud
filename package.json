@@ -1,0 +1,20 @@
+{
+  "name": "hci-one-board-remote-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HCI ONE Board Remote Cloud: one view of every hospital's boards, with Microsoft sign in, roles, the HCI location lock and an audit log. Board Remote installs connect out to it.",
+  "main": "src/server.js",
+  "scripts": {
+    "migrate": "node src/migrate.js",
+    "start": "node src/server.js",
+    "test": "node test/run.js",
+    "e2e": "node test/e2e/run.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "8.13.1",
+    "pg-connection-string": "2.14.1"
+  }
+}

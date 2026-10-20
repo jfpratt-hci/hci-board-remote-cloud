@@ -1,0 +1,67 @@
+#!/bin/bash
+ST="${FAKE_ADB_STATE:?}"
+echo "$(date +%T.%3N) $*" >> "$ST/calls.log"
+SERIAL=""
+if [ "$1" = "-s" ]; then SERIAL="$2"; shift 2; fi
+cmd="$1"; shift
+host="${SERIAL%%:*}"
+touch "$ST/connected"
+model_of() { case "${1%%:*}" in 127.0.0.2) echo ET4303L;; 127.0.0.3) echo ESY10i3;; 127.0.0.4) echo ET5503L;; 127.0.0.5) echo ET4303L;; *) echo ET3203L;; esac; }
+case "$cmd" in
+  version) echo "Android Debug Bridge version 1.0.41";;
+  start-server) exit 0;;
+  devices)
+    echo "List of devices attached"
+    [ -f "$ST/usb_on" ] && echo "R52T90ABCD             device usb:1-1 product:et3203 model:ET3203L device:et3203 transport_id:9"
+    while read -r s st; do [ -n "$s" ] && echo "$s         $st product:x model:$(model_of $s) device:x transport_id:1"; done < "$ST/connected"
+    echo "";;
+  connect)
+    s="$1"; h="${s%%:*}"
+    st=$(grep "^$h " "$ST/boards.cfg" | awk '{print $2}')
+    if [ -z "$st" ]; then echo "failed to connect to $s"; exit 1; fi
+    if grep -q "^$s " "$ST/connected"; then echo "already connected to $s"; exit 0; fi
+    echo "$s $st" >> "$ST/connected"
+    if [ "$st" = "unauthorized" ]; then echo "failed to authenticate to $s"; else echo "connected to $s"; fi;;
+  disconnect) grep -v "^$1 " "$ST/connected" > "$ST/c2"; mv "$ST/c2" "$ST/connected"; echo "disconnected $1";;
+  shell)
+    c="$*"
+    if [ -z "$SERIAL" ] && [ -f "$ST/usb_on" ]; then host=usb; fi
+    case "$c" in
+      *@@T*) printf '@@T\n%s\n@@UP\n86400.00 1000.00\n@@WIN\n  mCurrentFocus=Window{1 u0 com.hci.one.board/.MainActivity}\n@@PWR\n  mWakefulness=Awake\n@@DF\nFilesystem 1K-blocks Used Available Use%% Mounted on\n/dev/block/dm-0 12000000 4000000 8000000 34%% /data\n@@MEM\nMemTotal: 2000000 kB\nMemAvailable: 1000000 kB\n@@IP\n@@WL\n@@SPD\n100\n@@CR\n@@END\n' "$(date +%s)";;
+      *ro.serialno*) o=${host##*.}; printf 'SN0%s
+@@
+abcdef00%s
+@@
+aa:bb:cc:00:00:0%s
+@@
+
+@@
+board%s
+@@
+null
+@@
+29
+@@
+arm64-v8a
+@@
+
+' $o $o $o $o;;
+      *app_process*) echo "[server] INFO: Device: fake (Android 10)"; [ -f "$ST/helper_crash" ] && { echo "[server] ERROR: Could not create encoder" >&2; exit 1; }; exec sleep 600;;
+      *getprop*) echo Elo; model_of "$host"; echo 10; [ "$host" = 127.0.0.3 ] && echo "Physical size: 1280x800" || echo "Physical size: 1920x1080";;
+      *dumpsys*) 
+        case "$host" in 127.0.0.3) app=com.hci.one.doorsign/.MainActivity;; 127.0.0.4) app=com.hci.one.command/.UnitBoardActivity;; *) app=com.hci.one.board/com.hci.one.board.MainActivity;; esac
+        echo "  mCurrentFocus=Window{3c4f1b8 u0 $app}"
+        echo "  mFocusedApp=ActivityRecord{9a1 u0 $app t12}"
+        [ -f "$ST/asleep_$host" ] && echo "  mWakefulness=Asleep" || echo "  mWakefulness=Awake";;
+      *"ip -o -4"*) echo "1: lo    inet 127.0.0.1/8 scope host lo"; echo "3: wlan0    inet 192.0.2.9/24 brd 127.0.3.255 scope global wlan0";;
+      *) exit 0;;
+    esac;;
+  exec-out) f="$ST/shot_$host.png"; [ -f "$f" ] || f="$ST/shot_default.png"; cat "$f";;
+  install) echo "Performing Streamed Install"; echo "Success";;
+  push) [ -f "$ST/push_fail" ] && { echo "adb: error: failed to copy" >&2; exit 1; }; echo "$1: 1 file pushed, 0 skipped.";;
+  forward)
+    if [ "$1" = "--remove" ]; then echo "removed $2" >> "$ST/calls.log"; exit 0; fi
+    echo "${FAKE_SCRCPY_PORT:-27183}";;
+  reboot) exit 0;;
+  tcpip) echo "restarting in TCP mode port: $1"; grep -q "^127.0.0.9 " "$ST/boards.cfg" || echo "127.0.0.9 device" >> "$ST/boards.cfg"; rm -f "$ST/usb_on";;
+esac

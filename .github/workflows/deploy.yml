@@ -1,0 +1,51 @@
+# Builds the cloud's image on every push to main and rolls it out to Azure Container Apps.
+# No secrets: GitHub signs in to Azure with a short lived OpenID Connect token that the
+# id-br-deploy identity trusts for this repo's main branch only.
+# Repo variables (Settings > Secrets and variables > Actions > Variables):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, ACR_NAME, RESOURCE_GROUP, CONTAINER_APP
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+concurrency: deploy
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: ci }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - name: Unit and database tests
+        env: { PGHOST: localhost, PGUSER: postgres, PGPASSWORD: ci }
+        run: npm test
+  deploy:
+    needs: test
+    if: vars.CONTAINER_APP != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and push the image
+        run: |
+          az acr login --name "${{ vars.ACR_NAME }}"
+          IMG="${{ vars.ACR_NAME }}.azurecr.io/board-remote-cloud:${GITHUB_SHA::12}"
+          docker build -t "$IMG" .
+          docker push "$IMG"
+          echo "IMG=$IMG" >> "$GITHUB_ENV"
+      - name: Roll out
+        run: az containerapp update -g "${{ vars.RESOURCE_GROUP }}" -n "${{ vars.CONTAINER_APP }}" --image "$IMG"
