@@ -55,7 +55,7 @@ Tests: `npm test` (93, token sign in, database, sign in, agent link, concurrency
 | `HCI_TENANT_ID` | HCI's Microsoft tenant |
 | `BR_BOOTSTRAP_ADMIN` | the first HCI admin's email, used once |
 
-## Azure (not created yet, needs John's approval)
+## Azure (created 20 Oct 2026; wiring: `deploy/azure-setup.sh` in Cloud Shell)
 
 1. **Entra app registration: done 20 Oct 2026.** "HCI ONE Board Remote Cloud" in HCI's tenant (e55dab1c-8b8f-4c0b-bb05-f0fb52f04e62), client ID 3410a8c2-8e42-4156-835e-66ce79e7da6d, multiple organizations limited to allowed tenants (hci-tv.com so far), redirect `https://boardremote.hci-tv.com/auth/callback`. Non secret settings are in `deploy.env`. The client secret is made at step 3 straight into Key Vault. Each new hospital: add its tenant to the allowed list, and its admin grants consent once (the app has no verified publisher yet).
 2. **Two managed identities**, id-br-owner (migrations) and id-br-app (the service), then **Azure Database for PostgreSQL, Flexible Server** with Microsoft Entra sign in only (no passwords), TLS required, backups 35 days, firewall open only to the container's outbound address. Run `db/bootstrap_entra.sql` once from Cloud Shell; it binds the roles br_owner and br_app to the two identities. The service then signs in with tokens (`DB_IDENTITY_APP`, `DB_IDENTITY_OWNER`, see `src/aztoken.js`).
