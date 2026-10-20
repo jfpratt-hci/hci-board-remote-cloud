@@ -76,10 +76,10 @@ az containerapp update -n $APP -g $RG --min-replicas 1 --max-replicas 1 --cpu 0.
 
 echo "6/7 Database: open only to the app (and this shell for a minute), then make the two roles"
 i=0; for ip in $(q containerapp show -n $APP -g $RG --query "properties.outboundIpAddresses"); do
-  i=$((i+1)); az postgres flexible-server firewall-rule create -g $RG -n $PG --rule-name "app-$i" --start-ip-address "$ip" --end-ip-address "$ip" -o none
+  i=$((i+1)); az postgres flexible-server firewall-rule create -g $RG --server-name $PG --name "app-$i" --start-ip-address "$ip" --end-ip-address "$ip" -o none
 done
 MYIP=$(curl -s https://api.ipify.org)
-az postgres flexible-server firewall-rule create -g $RG -n $PG --rule-name cloudshell-temp --start-ip-address "$MYIP" --end-ip-address "$MYIP" -o none
+az postgres flexible-server firewall-rule create -g $RG --server-name $PG --name cloudshell-temp --start-ip-address "$MYIP" --end-ip-address "$MYIP" -o none
 export PGPASSWORD=$(q account get-access-token --resource-type oss-rdbms --query accessToken)
 cat > /tmp/bootstrap_entra.sql <<'SQL'
 select * from pgaadauth_create_principal_with_oid('br_owner', :'owner_oid', 'service', false, false)
@@ -93,7 +93,7 @@ select rolname, rolbypassrls, rolsuper from pg_roles where rolname in ('br_owner
 SQL
 psql "host=$DBH dbname=postgres user=$ADMIN sslmode=require" -v ON_ERROR_STOP=1 -v owner_oid="$OWNER_OID" -v app_oid="$APP_OID" -f /tmp/bootstrap_entra.sql
 unset PGPASSWORD
-az postgres flexible-server firewall-rule delete -g $RG -n $PG --rule-name cloudshell-temp --yes -o none
+az postgres flexible-server firewall-rule delete -g $RG --server-name $PG --name cloudshell-temp --yes -o none
 
 echo "7/7 Done. Set these as GitHub repo variables (not secrets; none of them is sensitive):"
 echo "  AZURE_CLIENT_ID=$DEP_CID"
