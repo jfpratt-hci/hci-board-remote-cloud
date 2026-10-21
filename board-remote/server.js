@@ -106,10 +106,12 @@ function exes() {
     store.settings.adbPath,
     process.env.ADB,
     IS_WIN && process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Android', 'Sdk', 'platform-tools', 'adb.exe') : '',
+    process.env.BR_TOOLS_DIR ? path.join(process.env.BR_TOOLS_DIR, 'scrcpy', 'adb' + ext) : '',
     path.join(ROOT, 'tools', 'scrcpy', 'adb' + ext),
     path.join(ROOT, 'tools', 'platform-tools', 'adb' + ext)
   ];
-  const scrList = [store.settings.scrcpyPath, path.join(ROOT, 'tools', 'scrcpy', 'scrcpy' + ext)];
+  // the Windows app ships scrcpy in Program Files, where the desktop helper (run as the signed in user) can start it
+  const scrList = [store.settings.scrcpyPath, process.env.BR_TOOLS_DIR ? path.join(process.env.BR_TOOLS_DIR, 'scrcpy', 'scrcpy' + ext) : '', path.join(ROOT, 'tools', 'scrcpy', 'scrcpy' + ext)];
   exeCache = {
     at: Date.now(),
     adb: adbList.find(isFile) || onPath('adb' + ext),
@@ -396,14 +398,46 @@ function snapTick() {
 const KEYS = { home: 3, back: 4, recents: 187, power: 26, wake: 224, sleep: 223, volup: 24, voldown: 25, mute: 164, menu: 82 };
 const int = v => { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= 0 && n < 20000 ? n : null; };
 
+/* ---------------- the desktop helper (Windows app) ----------------
+   As a Windows service, Board Remote has no desktop, so a window it opened would be invisible.
+   The desktop helper runs in each signed in user's session (started at sign in) and asks for work
+   here; Mirror and Shell windows are handed to it and open on that person's screen. */
+const desk = { waiting: [], queue: [], pending: new Map(), seen: 0 };
+const deskOnline = () => desk.waiting.length > 0 || Date.now() - desk.seen < 40000;
+function deskPoll(res) {
+  desk.seen = Date.now();
+  const job = desk.queue.shift();
+  if (job) return send(res, 200, { ok: true, job });
+  const w = { res, t: setTimeout(() => { desk.waiting = desk.waiting.filter(x => x !== w); send(res, 200, { ok: true, job: null }); }, 25000) };
+  desk.waiting.push(w);
+  res.on('close', () => { clearTimeout(w.t); desk.waiting = desk.waiting.filter(x => x !== w); });
+}
+function viaDesktop(job, waitMs) {
+  if (!deskOnline()) return Promise.resolve({ ok: false, message: 'Nobody is signed in to Windows on this PC, so there is no screen to open the window on. Sign in to this PC, or use Live view with touch from any browser.' });
+  job.id = crypto.randomBytes(6).toString('hex');
+  return new Promise(resolve => {
+    const t = setTimeout(() => { desk.pending.delete(job.id); desk.queue = desk.queue.filter(j => j !== job); resolve({ ok: false, message: 'The Board Remote desktop helper did not answer. Sign out of Windows and back in, or reinstall Board Remote.' }); }, waitMs || 15000);
+    desk.pending.set(job.id, r => { clearTimeout(t); resolve(r); });
+    const w = desk.waiting.shift();
+    if (w) { clearTimeout(w.t); desk.seen = Date.now(); send(w.res, 200, { ok: true, job }); } else desk.queue.push(job);
+  });
+}
+function deskResult(body) {
+  const fn = desk.pending.get(String(body.id || ''));
+  if (!fn) return false;
+  desk.pending.delete(String(body.id));
+  fn({ ok: !!body.ok, message: String(body.message || '').slice(0, 500), command: body.command });
+  return true;
+}
+
 function mirror(b) {
   const r = R(b);
   const ex = exes();
   if (!ex.scrcpy) return Promise.resolve({ ok: false, message: 'scrcpy is not installed yet. Run SETUP.bat once.' });
   if (r.mirror && r.mirror.exitCode === null) return Promise.resolve({ ok: true, message: 'The mirror window for ' + b.name + ' is already open.' });
-  // A Windows service has no desktop, so a scrcpy window would open where nobody can see it.
-  if (AS_SERVICE) return Promise.resolve({ ok: false, message: 'Board Remote runs as a Windows service, so it cannot open a mirror window. Click the board for Live view with touch instead.' });
   const args = ['--serial', serialOf(b), '--window-title', b.name + '   ' + serialOf(b), '--no-audio', '--max-size', String(store.settings.mirrorMaxSize || 1920)];
+  // As a Windows service: the window opens on the signed in person's screen, through the desktop helper.
+  if (AS_SERVICE) return viaDesktop({ type: 'mirror', exe: ex.scrcpy, args, adb: ex.adb || '', name: b.name });
   const env = Object.assign({}, process.env);
   if (ex.adb) env.ADB = ex.adb;
   let child;
@@ -437,7 +471,7 @@ function openShell(b) {
   const command = 'adb -s ' + serialOf(b) + ' shell';
   if (!bin) return { ok: false, message: 'adb was not found. Run SETUP.bat once.', command };
   if (!IS_WIN) return { ok: false, message: 'Shell windows open on Windows only. Run this in a terminal:', command };
-  if (AS_SERVICE) return { ok: false, message: 'Board Remote runs as a Windows service, so it cannot open a window. Run this in a Command Prompt:', command };
+  if (AS_SERVICE) return viaDesktop({ type: 'shell', adb: bin, serial: serialOf(b), title: (b.name.replace(/[^A-Za-z0-9 ._]/g, '').trim() || 'Board') + '  ' + serialOf(b) }).then(r => Object.assign({ command }, r));
   const dir = path.join(ROOT, 'tools', 'shells');
   fs.mkdirSync(dir, { recursive: true });
   const safe = b.name.replace(/[^A-Za-z0-9 ._]/g, '').trim() || 'Board';
@@ -925,7 +959,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': IMG_TYPES[mi[2]], 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
       return res.end(fs.readFileSync(f));
     }
-    if (req.method === 'GET' && p === '/api/ping') return send(res, 200, { ok: true, version: VERSION, service: AS_SERVICE });
+    if (req.method === 'GET' && p === '/api/ping') return send(res, 200, { ok: true, version: VERSION, service: AS_SERVICE, desktop: AS_SERVICE ? deskOnline() : true });
     if (health && /^\/api\/(health|found)\b/.test(p) && await health.handle(req, res, p, url)) return;
     if (deploy && /^\/api\/deploy\b/.test(p) && await deploy.handle(req, res, p, url)) return;
     if (logs && /^\/api\/logs\b/.test(p) && await logs.handle(req, res, p, url)) return;
@@ -990,6 +1024,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'POST') return send(res, 404, { ok: false, message: 'Not found' });
     // Custom header forces a CORS preflight, so no other site can post here.
     if (req.headers['x-board-remote'] !== '1') return send(res, 403, { ok: false, message: 'Forbidden' });
+
+    // the desktop helper asks for windows to open, and says how it went
+    if (p === '/api/desktop/poll') return deskPoll(res);
+    if (p === '/api/desktop/result') return send(res, 200, { ok: deskResult(await readJson(req)) });
 
     if (p === '/api/boards') {
       const body = await readJson(req);
@@ -1142,7 +1180,7 @@ const server = http.createServer(async (req, res) => {
       case 'mirror':
         return send(res, 200, await mirror(b));
       case 'shell':
-        return send(res, 200, openShell(b));
+        return send(res, 200, await openShell(b));
       case 'restartapp':
         return send(res, 200, await restartApp(b));
       case 'reboot': {
