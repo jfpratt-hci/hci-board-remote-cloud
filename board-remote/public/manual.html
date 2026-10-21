@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual · Board Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231E1C19'/%3E%3Cpath d='M7 6h8a2 2 0 0 1 2 2v10H9a2 2 0 0 1-2-2z' stroke='white' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ground:#F2EFE9; --card:#FFFFFF; --soft:#F6F4EF; --line:#E7E2D9;
+  --ink:#1E1C19; --ink2:#3A3733; --muted:#7A766F;
+  --green:#14A44D; --blue:#2563EB; --blue-bg:#E3EBFD; --amber-bg:#FCF0D6;
+  --r:16px; --g:16px;
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ground);color:var(--ink);font:500 15px/1.6 var(--font);display:grid;grid-template-rows:auto minmax(0,1fr);gap:var(--g);padding:var(--g);overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+svg.ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+a{color:var(--blue)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--soft);font-weight:700;font-size:13px;white-space:nowrap;color:inherit;text-decoration:none}
+.btn:hover{background:#ECE8E1}
+.btn.dark{background:var(--ink);color:#fff}
+
+/* top bar, same as the other views */
+.top{background:var(--card);border-radius:var(--r);padding:10px 14px;display:grid;grid-template-columns:auto auto 1fr auto;gap:18px;align-items:center}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:40px;height:40px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.brand .mark svg{width:22px;height:22px}
+.brand .kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.nav{display:inline-flex;padding:4px;border-radius:999px;background:var(--soft);gap:2px}
+.nav a{height:34px;padding:0 14px;border-radius:999px;color:var(--muted);font-weight:800;font-size:13px;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;text-decoration:none}
+.nav a:hover{color:var(--ink)}
+.nav a svg{width:14px;height:14px}
+.actions-top{display:flex;gap:8px;align-items:center}
+.here{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:999px;background:var(--ink);color:#fff;font-weight:800;font-size:13px}
+@media (max-width:1400px){.actions-top .btn span{display:none}.actions-top .btn{padding:0 12px}}
+
+/* toc + reading column */
+.wrap{min-height:0;display:grid;grid-template-columns:272px minmax(0,1fr);gap:var(--g)}
+.toc{background:var(--card);border-radius:var(--r);padding:18px 12px;overflow:auto;min-height:0}
+.toc .lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:0 10px 8px}
+.toc a{display:block;padding:7px 10px;border-radius:10px;color:var(--ink2);text-decoration:none;font-weight:600;font-size:13.5px;line-height:1.35}
+.toc a small{display:block;color:var(--muted);font-weight:500;font-size:11.5px}
+.toc a.sub{padding-left:22px;font-size:12.5px;color:var(--muted)}
+.toc a:hover{background:var(--soft)}
+.toc a.on{background:var(--ink);color:#fff}
+.toc a.on small{color:#CFCAC1}
+.read{background:var(--card);border-radius:var(--r);overflow:auto;min-height:0;scroll-behavior:smooth}
+.doc{max-width:900px;margin:0 auto;padding:40px 48px 120px}
+.doc h1{font-size:32px;line-height:1.15;margin:0 0 6px;letter-spacing:-.015em}
+.doc .meta{color:var(--muted);font-size:13px;margin-bottom:18px}
+.doc h2{font-size:24px;line-height:1.2;margin:56px 0 12px;padding-top:24px;border-top:1px solid var(--line);scroll-margin-top:16px}
+.doc h2:first-of-type{border-top:0;padding-top:0;margin-top:32px}
+.doc h3{font-size:18px;margin:32px 0 8px;scroll-margin-top:16px}
+.doc h4{font-size:15px;margin:22px 0 6px}
+.doc p{margin:0 0 12px}
+.doc ul,.doc ol{margin:0 0 14px;padding-left:24px}
+.doc li{margin:4px 0}
+.doc code{font:600 13px var(--mono);background:var(--soft);padding:2px 6px;border-radius:6px}
+.doc table{width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:13.5px;line-height:1.45}
+.doc th{text-align:left;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line)}
+.doc td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.doc td:first-child{font-weight:700}
+.doc figure{margin:16px 0 22px}
+.doc figure img{width:100%;display:block;border-radius:12px;border:1px solid var(--line)}
+.doc figure svg{width:100%;height:auto;display:block}
+.doc figcaption{font-size:12.5px;color:var(--muted);margin-top:8px}
+.lead{font-size:16.5px;color:var(--ink2)}
+.callout{background:var(--blue-bg);border-radius:12px;padding:12px 16px;margin:12px 0 18px;font-size:14px}
+@media (max-width:1100px){.wrap{grid-template-columns:1fr}.toc{display:none}.doc{padding:28px 24px 80px}}
+
+/* print: the reading column only, each appendix on a new page */
+@media print{
+  body{display:block;overflow:visible;background:#fff;padding:0;font-size:11pt}
+  .top,.toc{display:none}
+  .wrap{display:block}
+  .read{overflow:visible;border-radius:0}
+  .doc{max-width:none;padding:0}
+  .doc h2{break-before:page;border-top:0;margin-top:0;padding-top:0}
+  .doc h2:first-of-type{break-before:auto}
+  .doc figure,.doc table{break-inside:avoid}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+<style>html:not(.hci-remote-on) .navRemote{display:none!important}</style>
+<script>try{if(localStorage.getItem('hciRemoteOn'))document.documentElement.classList.add('hci-remote-on')}catch(e){}</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="mark"><svg class="ic" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
+  </div>
+  <nav class="nav" aria-label="Views">
+    <a href="/"><svg class="ic" viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4"/></svg>Boards</a>
+    <a href="/health"><svg class="ic" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8l1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>Device health</a>
+    <a href="/health#new"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></svg>New devices</a>
+    <a href="/deploy"><svg class="ic" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Deploy</a>
+    <a href="/audit"><svg class="ic" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Audit</a>
+    <a class="navRemote" href="/remote"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1"/></svg>Remote</a>
+  </nav>
+  <div><span class="here"><svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>Manual</span></div>
+  <div class="actions-top">
+    <button class="btn" id="btnBack" title="Back to where you were"><svg class="ic" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>Back</span></button>
+    <button class="btn dark" id="btnPrint" title="Print or save as PDF"><svg class="ic" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg><span>Print or save as PDF</span></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc" id="toc" aria-label="Contents">
+    <div class="lbl">Contents</div>
+    <a href="#start">Quick start<small>Set up in seven steps</small></a>
+    <a href="#before">A. Before you install<small>PC, network and boards</small></a>
+    <a href="#install">B. Install, upgrade and remove</a>
+    <a href="#boards">C. Boards<small>Cards, statuses, live view</small></a>
+    <a href="#health">D. Device health<small>Heartbeat, check chain, fixes</small></a>
+    <a href="#new">E. New devices<small>Find and claim</small></a>
+    <a href="#deploy">F. Deploy</a>
+    <a class="sub" href="#import">Room list import</a>
+    <a class="sub" href="#push">Push an app</a>
+    <a class="sub" href="#roomsign">Room signs</a>
+    <a class="sub" href="#mediacare">Rooms in MediaCare</a>
+    <a href="#settings">G. Settings and alerts</a>
+    <a href="#trouble">H. Troubleshooting</a>
+    <a href="#security">I. Security, privacy and files</a>
+    <a href="#remote">J. Remote (proof of concept)</a>
+    <a href="#audit">K. Morning audit</a>
+    <a href="#cloud">L. HCI ONE Cloud</a>
+    <a href="#winapp">M. Windows app and updates</a>
+  </nav>
+
+  <main class="read" id="read">
+  <article class="doc">
+    <h1>HCI ONE Board Remote Manual</h1>
+    <div class="meta">Version 2.0 · October 2026</div>
+    <p class="lead">Board Remote is a Windows tool that keeps every HCI device connected over network ADB: live screens with touch, a heartbeat with alerts, and bulk deploys of apps and room numbers. The quick start gets you running; Appendices A to I are the reference.</p>
+
+    <h2 id="start">Quick start</h2>
+    <p>Seven steps take a new PC from zip file to watched boards in about ten minutes. The PC must be on the same network as the boards, and each board needs USB debugging and network ADB on port 5555 (<a href="#before">Appendix A</a>).</p>
+    <ol>
+      <li>Unzip <b>HCI ONE Board Remote.zip</b> to a folder that will stay put, for example <code>C:\HCI\Board Remote</code>.</li>
+      <li>Double click <b>SETUP.bat</b>. It downloads Node and adb into the tools folder, puts a Board Remote shortcut on the desktop, and asks whether to start with Windows. Answer <b>Y</b> on a PC that watches boards all day.</li>
+      <li>Board Remote opens in its own window. After this, open it with the <b>Board Remote</b> shortcut.</li>
+      <li>Add the boards: <b>Deploy</b>, <b>Import room list</b>, paste rooms and IP addresses from Excel, then add them. Find boards, USB to WiFi and Add board also work.</li>
+      <li>At each board, tap <b>Allow</b> on "Allow USB debugging?" with <b>Always allow from this computer</b> ticked. This happens once per board.</li>
+      <li><b>Deploy</b>, <b>Push an app</b>, pick <b>HCI ONE ADB</b>, select every board, <b>Push</b>. Network ADB then survives reboots.</li>
+      <li><b>Device health</b>, the gear: site name, the Teams links for HCI Support and Hospital IT, then <b>Send a test alert</b>.</li>
+    </ol>
+    <table>
+      <thead><tr><th>To do this</th><th>Go to</th><th>Then</th></tr></thead>
+      <tbody>
+        <tr><td>See and control a board's screen</td><td>Boards</td><td>Click its screen. Click to tap, drag to swipe.</td></tr>
+        <tr><td>Find out why a board is offline</td><td>Device health</td><td>Pick the board. The check chain shows where it breaks, power to screen.</td></tr>
+        <tr><td>Fix a board that is acting up</td><td>Device health</td><td>Press the highlighted fix. It checks its own result.</td></tr>
+        <tr><td>Add a new board</td><td>New devices</td><td>Claim it, and have someone at the board tap Allow.</td></tr>
+        <tr><td>Replace a dead board</td><td>New devices</td><td>Claim the new one and pick Replace a board.</td></tr>
+        <tr><td>Update every door sign or whiteboard</td><td>Deploy, Push an app</td><td>Drop the APK, pick the type, Check versions, Push.</td></tr>
+        <tr><td>Set room numbers in MediaCare</td><td>Deploy, Rooms in MediaCare</td><td>Preview, Test on one, Apply to the rest.</td></tr>
+        <tr><td>Install an app on one board</td><td>Boards</td><td>Drag the APK onto that board's card.</td></tr>
+        <tr><td>Open a command line on a board</td><td>Boards</td><td>Shell on that board's card.</td></tr>
+        <tr><td>Stop Board Remote</td><td>STOP.bat</td><td>Or Stop Board Remote at the bottom of Boards.</td></tr>
+        <tr><td>Open this manual</td><td>Any view</td><td>The Manual button at the top right opens the section for that view.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="before">Appendix A. Before you install</h2>
+    <p>Board Remote runs on one Windows PC and talks to each board directly over the hospital network. Nothing is installed on a server, and nothing leaves the network except the optional Teams alerts and Claude diagnosis.</p>
+    <h4>The PC</h4>
+    <ul>
+      <li>Windows 10 or 11. No admin rights are needed.</li>
+      <li>On the same network as the boards, or with a route to them on TCP port 5555.</li>
+      <li>Internet once, during SETUP, to download Node and adb. With no internet, run SETUP.bat on another PC and copy the whole folder across, tools folder included.</li>
+      <li>Microsoft Edge opens the dashboard as its own window. Any browser works at http://localhost:7755 on that PC, and only that PC can open it.</li>
+    </ul>
+    <h4>Each board</h4>
+    <table>
+      <thead><tr><th>Setting</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td>USB debugging on, in Developer options</td><td>Lets the PC connect at all</td></tr>
+        <tr><td>Network ADB on port 5555</td><td>Lets the PC connect without a cable. USB to WiFi turns it on from a USB connection.</td></tr>
+        <tr><td>Allow tapped once for this PC, with Always allow ticked</td><td>The board trusts this PC's key from then on</td></tr>
+        <tr><td>HCI ONE ADB keeper installed</td><td>Keeps network ADB on after a reboot. Some boards also need root or the factory setting.</td></tr>
+        <tr><td>A DHCP reservation</td><td>The board keeps its IP, so the Boards list stays right</td></tr>
+        <tr><td>Unit, closet and room filled in</td><td>Device health groups boards by closet and spots a closet outage</td></tr>
+      </tbody>
+    </table>
+    <h4>Site size</h4>
+    <p>One PC watches a whole site. Board Remote was load tested with 154 simulated devices (75 whiteboards, 75 door signs and 4 Unit Status Boards):</p>
+    <table>
+      <thead><tr><th>What</th><th>How it scales</th></tr></thead>
+      <tbody>
+        <tr><td>Heartbeat</td><td>Each board about every 27 s, spread evenly: about 6 small text checks a second for 150 boards, never more than 16 at once</td></tr>
+        <tr><td>Screens</td><td>Only screens in view refresh: about 3 a second on Normal and 8 on Live, whatever the site size. Off costs nothing.</td></tr>
+        <tr><td>Reconnects</td><td>At most 16 at once. A board that has not answered for 2 minutes is tried every 30 s, and Connect all tries at once.</td></tr>
+        <tr><td>App push</td><td>6 boards at a time by default, up to 16</td></tr>
+        <tr><td>The PC</td><td>Board Remote itself used about 70 MB of memory and a few percent of one core. Any current office PC is enough.</td></tr>
+      </tbody>
+    </table>
+    <h4>Optional connections</h4>
+    <table>
+      <thead><tr><th>Connection</th><th>Used for</th><th>What you need</th></tr></thead>
+      <tbody>
+        <tr><td>Microsoft Teams</td><td>Alerts to HCI Support and Hospital IT</td><td>A Workflows link for each channel (<a href="#settings">Appendix G</a>)</td></tr>
+        <tr><td>MediaCare (Kuzzle)</td><td>Writing each device's room</td><td>MediaCare's address and a login that can change device records</td></tr>
+        <tr><td>Claude API</td><td>Diagnose with Claude in Device health</td><td>An API key, entered in Settings</td></tr>
+      </tbody>
+    </table>
+    <h4>What Hospital IT sets up once</h4>
+    <ul>
+      <li>A DHCP reservation for each board, so a board never moves to a new address.</li>
+      <li>Port 5555 open from the Board Remote PC to the device network. Nothing else needs it.</li>
+      <li>A time server the boards can reach (NTP, UDP 123). Without it clocks drift and sign ins fail.</li>
+    </ul>
+    <h4>How it fits together</h4>
+    <figure>
+      <svg viewBox="0 0 760 352" role="img" aria-label="One PC reaches every board over ADB on port 5555" font-family="Montserrat, Segoe UI, system-ui, sans-serif" font-size="12.5">
+        <defs><marker id="fit-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#A8A39A"/></marker></defs>
+        <text x="24" y="34" font-size="15" font-weight="700" fill="#1E1C19">One PC reaches every board over ADB on port 5555</text>
+        <text x="24" y="54" font-size="11.5" fill="#7A766F">Teams and Claude are optional and the only links outside the hospital network</text>
+        <g fill="none" stroke="#A8A39A" stroke-width="1.25">
+          <path d="M214 168V232" marker-end="url(#fit-arrow)"/>
+          <path d="M404 124H432M432 116V292"/>
+          <path d="M432 116H460" marker-end="url(#fit-arrow)"/>
+          <path d="M432 204H460" marker-end="url(#fit-arrow)"/>
+          <path d="M432 292H460" marker-end="url(#fit-arrow)"/>
+          <path d="M404 310H460" stroke-dasharray="4 4" marker-end="url(#fit-arrow)"/>
+        </g>
+        <text x="226" y="196" font-size="11.5" fill="#7A766F">ADB on TCP port 5555</text>
+        <text x="226" y="212" font-size="11.5" fill="#7A766F">heartbeat, screens, installs, fixes</text>
+        <rect x="24" y="80" width="380" height="88" rx="8" fill="#E3EBFD" stroke="#2563EB" stroke-width="2"/>
+        <text x="40" y="104" font-size="13" font-weight="700" fill="#1E1C19">Board Remote PC (Windows)</text>
+        <text x="40" y="120" fill="#1E1C19">Boards · Device health · New devices · Deploy</text>
+        <text x="40" y="136" fill="#7A766F">Dashboard opens only on this PC (localhost:7755)</text>
+        <text x="40" y="152" fill="#7A766F">adb, scrcpy and Node live in its tools folder</text>
+        <rect x="24" y="232" width="380" height="88" rx="8" fill="none" stroke="#A8A39A" stroke-width="1.25"/>
+        <text x="40" y="256" font-size="13" font-weight="700" fill="#1E1C19">HCI devices on the hospital network</text>
+        <text x="40" y="272" fill="#7A766F">Whiteboards, door signs, patient TVs,</text>
+        <text x="40" y="288" fill="#7A766F">Unit Status Boards, cameras and tablets</text>
+        <text x="40" y="304" fill="#7A766F">The HCI ONE ADB keeper keeps port 5555 open</text>
+        <rect x="460" y="80" width="276" height="72" rx="8" fill="none" stroke="#A8A39A" stroke-width="1.25"/>
+        <text x="476" y="104" font-size="13" font-weight="700" fill="#1E1C19">Microsoft Teams</text>
+        <text x="476" y="120" fill="#7A766F">Alerts to HCI Support and</text>
+        <text x="476" y="136" fill="#7A766F">Hospital IT, with escalation</text>
+        <rect x="460" y="168" width="276" height="72" rx="8" fill="none" stroke="#A8A39A" stroke-width="1.25"/>
+        <text x="476" y="192" font-size="13" font-weight="700" fill="#1E1C19">Claude API (optional)</text>
+        <text x="476" y="208" fill="#7A766F">Diagnose with Claude</text>
+        <text x="476" y="224" fill="#7A766F">No screenshots; logs only if allowed</text>
+        <rect x="460" y="256" width="276" height="72" rx="8" fill="none" stroke="#A8A39A" stroke-width="1.25"/>
+        <text x="476" y="280" font-size="13" font-weight="700" fill="#1E1C19">MediaCare (Kuzzle)</text>
+        <text x="476" y="296" fill="#7A766F">Holds the room for each device</text>
+        <text x="476" y="312" fill="#7A766F">Deploy writes it; the apps read it</text>
+      </svg>
+      <figcaption>Board Remote starts every connection: ADB to the boards, and web calls to Teams, Claude and MediaCare once they are set up. The dashed line is the apps on the boards reading their room from MediaCare.</figcaption>
+    </figure>
+
+    <h2 id="install">Appendix B. Install, upgrade and remove</h2>
+    <p>SETUP.bat runs once. After that Board Remote runs quietly in the background, and the window is only a view of it: closing the window does not stop the watching or the alerts.</p>
+    <h4>What SETUP.bat does</h4>
+    <ol>
+      <li>Uses the Node already on the PC (version 16 or newer), or downloads a portable copy into the tools folder.</li>
+      <li>Downloads scrcpy, which brings adb, into the tools folder. If Android Studio is on the PC, Board Remote uses its adb so the two never fight.</li>
+      <li>Puts a Board Remote shortcut on the desktop.</li>
+      <li>Asks "Keep your boards connected every time Windows starts?" Y starts Board Remote quietly at every sign in; N turns that off.</li>
+      <li>Opens Board Remote.</li>
+    </ol>
+    <h4>The three files you use</h4>
+    <table>
+      <thead><tr><th>File</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>START.bat, or the desktop shortcut</td><td>Starts Board Remote if it is not running, then opens the window. The very first run calls SETUP.bat.</td></tr>
+        <tr><td>STOP.bat</td><td>Stops Board Remote. Boards keep working; they are just not watched. Stop Board Remote at the bottom of the Boards page does the same.</td></tr>
+        <tr><td>SETUP.bat</td><td>Run again any time to repair the tools folder or change the start with Windows answer.</td></tr>
+      </tbody>
+    </table>
+    <h4>Upgrade</h4>
+    <ol>
+      <li>Run STOP.bat.</li>
+      <li>Unzip the new version over the same folder and replace the files.</li>
+      <li>Run START.bat. Boards, settings, history and the app library stay, because they live in files the zip does not contain (<a href="#security">Appendix I</a>).</li>
+    </ol>
+    <p><b>Move to another PC.</b> Copy the whole folder, then run SETUP.bat on the new PC. Each board asks for Allow once more, because every PC has its own ADB key.</p>
+    <p><b>Remove.</b> Run STOP.bat. Press Windows and R, type <code>shell:startup</code>, and delete Board Remote there. Delete the desktop shortcut and the folder.</p>
+
+    <h2 id="boards">Appendix C. Boards</h2>
+    <p>The Boards page shows a card for every device, sorted by unit, room and type, and checks the ADB link to each one every few seconds. A board that drops is reconnected on its own.</p>
+    <figure><img src="/manual/boards.webp" alt="The Boards page"><figcaption>The Boards page: one card per device, in room order.</figcaption></figure>
+    <h4>The top bar</h4>
+    <table>
+      <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Room or IP, and Show</td><td>Appear once a site has 12 boards. Type a room, name or IP to find a board, or show one unit, one type, or only the boards that need a look. On a big site the other buttons show as icons.</td></tr>
+        <tr><td>Import rooms</td><td>Opens the room list import in Deploy (<a href="#import">Appendix F</a>)</td></tr>
+        <tr><td>Find boards</td><td>Looks across this PC's network for anything with ADB open on 5555 and adds it in one click</td></tr>
+        <tr><td>USB to WiFi</td><td>For a board plugged into this PC by USB: turns on network ADB and adds it. Then unplug the cable.</td></tr>
+        <tr><td>Add board</td><td>Adds one board by IP, with its type, room, unit and closet</td></tr>
+        <tr><td>Connect all</td><td>Reconnects every board, including any you disconnected</td></tr>
+        <tr><td>Manual</td><td>Opens this manual at the section for the page you are on</td></tr>
+      </tbody>
+    </table>
+    <h4>Each card</h4>
+    <ul>
+      <li>The dot and status word, the name, the type, the model and the Android version. A board named by the room list shows as Room 401 with its type on the line below.</li>
+      <li>A screen preview. The Screens setting at the bottom of the page picks Live, Normal or Off. Only the screens in view refresh, and the page shares one budget: Normal is every 4 s and Live about every second when a few boards are in view, slower when many are, so a large site never floods the network. The bottom line shows how often the screens in view refresh.</li>
+      <li>The address. Click it to copy the adb shell command for that board.</li>
+      <li>Connect or Disconnect, Mirror and Shell.</li>
+      <li>The menu (three dots): Rename or change address, Copy adb command, Restart the app on screen, Reboot board, Remove from list.</li>
+      <li>Drag an APK onto a card to install it on that one board. For many boards use Deploy.</li>
+      <li>A Screen asleep badge on the preview. Click it to wake the screen.</li>
+    </ul>
+    <h4>Status words</h4>
+    <table>
+      <thead><tr><th>Word</th><th>Meaning</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>Connected</td><td>ADB is connected and the board answers</td><td>Nothing</td></tr>
+        <tr><td>Connecting</td><td>Board Remote is reaching the board</td><td>Wait a few seconds</td></tr>
+        <tr><td>Approve on board</td><td>The board is waiting for Allow</td><td>At the board tap Allow, with Always allow from this computer ticked</td></tr>
+        <tr><td>Not responding</td><td>ADB sees the board but it does not answer</td><td>Board Remote reconnects it on its own after three tries</td></tr>
+        <tr><td>Not reachable</td><td>Nothing answers on port 5555</td><td>Power, cable, switch port, or network ADB is off. Device health shows which.</td></tr>
+        <tr><td>Disconnected</td><td>You disconnected it</td><td>Click Connect</td></tr>
+        <tr><td>Not connected</td><td>Keep connected is off for this board</td><td>Click Connect, or turn Keep connected on in Rename</td></tr>
+      </tbody>
+    </table>
+    <h4>Live view</h4>
+    <p>Click a board's screen to open it full size.</p>
+    <ul>
+      <li>The label at the top says Live video (the board's own video stream, Android 5 and newer) or Snapshots (a fresh picture about every second).</li>
+      <li>Click to tap and drag to swipe, as if your mouse were a finger.</li>
+      <li>Buttons on the right: Back, Home, Recents, Wake, Sleep, Power, Vol down, Mute and Vol up.</li>
+      <li>Live mirror with full control opens a separate window with keyboard input. Shell window opens a command line on the board.</li>
+      <li>Restart the app on screen and Reboot board are there too. Esc closes the live view.</li>
+    </ul>
+    <figure><img src="/manual/live.webp" alt="Live view of one board"><figcaption>Live view of one board, with the controls on the right (a test board's demo screen).</figcaption></figure>
+
+    <h3 id="snapshots">Snapshots for audits</h3>
+    <p><b>Snapshots</b> on the top bar saves a picture of every connected board's screen to a folder, so you can line up what was on a board against the messages that came in. <b>Capture all connected</b> saves them now; set <b>Every N minutes</b> to keep saving on a timer, and <b>Keep N days</b> to clear old ones. Files are named by room, board and time, under the folder shown (by default a snapshots folder next to Board Remote, which you can change). The gallery shows the newest first; click one to open it full size, or Open folder to see them all. A snapshot is a picture of the board's screen, so keep the folder inside the hospital.</p>
+
+    <h2 id="health">Appendix D. Device health</h2>
+    <p>Device health checks every board every 30 seconds, says where a problem sits and who owns it, and fixes the common ones remotely. Pick a board on the heartbeat wall to see its detail in the middle column.</p>
+    <figure><img src="/manual/health.webp" alt="Device health"><figcaption>Device health: the heartbeat wall, one board's check chain, and open issues.</figcaption></figure>
+    <h4>Heartbeat states</h4>
+    <table>
+      <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Online</td><td>Answered its last heartbeat</td></tr>
+        <tr><td>Late</td><td>No answer for 45 s</td></tr>
+        <tr><td>Degraded</td><td>Answers, but something is wrong: clock, app, crash, screen, storage, server, or Allow pending</td></tr>
+        <tr><td>Offline</td><td>Missed heartbeats for 90 s (changeable in Settings)</td></tr>
+        <tr><td>Checking or paused</td><td>Not checked yet, or you disconnected it</td></tr>
+      </tbody>
+    </table>
+    <p>The wall groups boards by unit, closet and room, one square per board. When 3 or more boards in one closet (or one network, if no closet is set) go quiet within 2 minutes, it is one problem: Device health raises a single closet alert for Hospital IT instead of one per board. That alert stays open until every board in it is back, so after a power or switch outage the boards that boot last do not each raise an alert of their own.</p>
+    <h4>Where it breaks, power up to the screen</h4>
+    <table>
+      <thead><tr><th>Step</th><th>What is checked</th></tr></thead>
+      <tbody>
+        <tr><td>Power</td><td>How long the board has been up, and free storage</td></tr>
+        <tr><td>Link</td><td>Wired speed, or WiFi signal strength</td></tr>
+        <tr><td>Network</td><td>Answer time from this PC</td></tr>
+        <tr><td>Network ADB</td><td>Port 5555 open, refused, or waiting for Allow</td></tr>
+        <tr><td>Clock</td><td>Difference from this PC's clock</td></tr>
+        <tr><td>HCI ONE server</td><td>The board can reach the server, if one is set in Settings</td></tr>
+        <tr><td>App</td><td>The watched app is running and in front, and how often it crashed in 10 minutes</td></tr>
+        <tr><td>Screen</td><td>Awake, with no crash dialog on it</td></tr>
+      </tbody>
+    </table>
+    <p>The first failing step is where to look. Under it, the <b>first read</b> names the cause in plain words, the owner (HCI Support or Hospital IT) and the fix to try.</p>
+    <p><b>Console.</b> Look at the board without walking to it: See the screen, Pull logs, Device info. Then fix it:</p>
+    <table>
+      <thead><tr><th>Fix</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Restart app</td><td>Closes the watched app and opens it again, about 10 s</td></tr>
+        <tr><td>Wake screen</td><td>Turns the screen on</td></tr>
+        <tr><td>Sync clock</td><td>Sets the board's clock from this PC (needs root), otherwise turns on automatic time</td></tr>
+        <tr><td>Free up storage</td><td>Clears app caches. App data is kept.</td></tr>
+        <tr><td>Reconnect ADB</td><td>Drops the ADB link and opens it again</td></tr>
+        <tr><td>Install ADB keeper</td><td>Installs HCI ONE ADB so network ADB stays on through reboots</td></tr>
+        <tr><td>Reboot board</td><td>The screen goes dark for about a minute</td></tr>
+      </tbody>
+    </table>
+    <p>The fix the first read recommends is highlighted. Each fix asks to confirm, shows the commands it ran, then checks the board again and says whether it worked. Open live view jumps to the board in Boards.</p>
+    <p><b>Diagnose with Claude</b> (optional, needs an API key in Settings) sends the board's facts and check results, gets back a cause, an owner, steps and a draft alert, and takes follow up questions. Screenshots are never sent, and log lines only if Settings allows it. Without a key, Copy evidence for Claude copies the same facts to paste into Claude.</p>
+    <p><b>Who gets told</b> lists each alert with its delivery (sent, failed, shown). Mark acknowledged stops the escalation. The right column holds open issues, the event feed and the alert rules in force.</p>
+    <p><b>Edit</b> (beside the board's name) sets its name, type, unit, closet, room and the app to watch. Use the app on screen now fills in the app that is in front.</p>
+
+    <h3 id="loghistory">Log history, camera and LED ring</h3>
+    <p>A board keeps only a small log of its own, so Board Remote pulls each connected board's log to this PC about every minute and keeps the last <b>48 hours</b> (change this in Settings). In the console, <b>Log history</b> shows it with a time range (1, 6, 24 or 48 hours), a level filter (all, warning and up, or errors) and search. <b>Camera</b> and <b>LED ring</b> are the same log filtered to the lines those parts of the board write; tune which words they match in Settings. <b>Crash</b> reads the board's crash log live. <b>Pull now</b> grabs the latest at once. <b>Recent logs</b> still pulls the last 200 lines live, and is the only log Claude is ever sent, and only if Settings allows it. <b>Save snapshot</b> saves this board's screen to the Snapshots folder.</p>
+
+    <h3 id="led">LED bezel control (door signs)</h3>
+    <p>When the board you have open is a door sign, the console shows <b>LED bezel</b>. Pick <b>Solid</b> or <b>Flash</b>, then a colour (Off, White, Red, Amber, Green or Blue), and Board Remote sends that to the sign. It uses the LED command set under the gear in Settings, which is preset for the HCI ONE Room Sign app; the door sign app on the board has to support LED control for this to take effect. If a sign does not respond, check that command, or that the sign is running a version of Room Sign that drives the ring.</p>
+    <p>On the heartbeat wall, a room with more than one board shows one coloured square per board. Click the square of the device you want to open its console, rather than the room always opening the one that needs attention most.</p>
+
+    <h2 id="new">Appendix E. New devices</h2>
+    <p>New devices lists anything that could be a board but is not on the list yet, and claims it in two taps: one here, one at the board. A device drops off the list as soon as it becomes a board, whether you claim it here or just add its IP on the Boards page.</p>
+    <p>A device shows up when it:</p>
+    <ul>
+      <li>answers ADB on port 5555 during a network sweep (Find devices now, or every few minutes as set in Settings),</li>
+      <li>is plugged into this PC by USB, or</li>
+      <li>is already connected to adb on this PC but not on the Boards list.</li>
+    </ul>
+    <p>HCI Support is told when a new device answers, and it waits in the list until someone claims or hides it.</p>
+    <figure><img src="/manual/new_devices.webp" alt="New devices"><figcaption>New devices: a USB board waiting to be claimed, and the Allow dialog the person at the board sees.</figcaption></figure>
+    <h4>Claim a device</h4>
+    <ol>
+      <li>Pick it in the list. Its model, address and how it was found are shown.</li>
+      <li>Choose <b>Add as a new board</b> and fill in name, type, room, unit, closet and the app to watch. Or choose <b>Replace a board</b> and pick the dead one: the new device takes its name, room and history.</li>
+      <li>Press <b>Claim and set up</b>. Board Remote connects; a USB device is switched to network ADB first.</li>
+      <li>Someone at the board checks that the key fingerprint in the board's Allow dialog matches the one shown here, ticks Always allow, and taps <b>Allow</b>. Board Remote waits up to 2 minutes.</li>
+      <li>Board Remote reads who the board is, installs the HCI ONE ADB keeper, syncs the clock and notes the app on screen as the app to watch. It then adds the board (or swaps it in) and takes the first heartbeat.</li>
+    </ol>
+    <p>Each step shows in the timeline as it happens. <b>Not ours, hide it</b> removes a device from the list; Hidden brings it back.</p>
+
+    <h2 id="deploy">Appendix F. Deploy</h2>
+    <p>Deploy sets up and updates a whole unit from one page: the room list builds the Boards page, Push an app installs on many boards at once, and Rooms in MediaCare gives each device its room. The left column holds the room list and the app library (or the MediaCare link), the middle the device table, the right what to do next.</p>
+
+    <h3 id="import">Room list import</h3>
+    <figure><img src="/manual/import.webp" alt="Room list import"><figcaption>Room list import: the pasted list on the left, the preview on the right.</figcaption></figure>
+    <ol>
+      <li><b>Deploy</b>, <b>Import room list</b>.</li>
+      <li>Paste from Excel, or type one line per room, or drop a .csv file on the box. For an Excel file, save it as CSV or copy the cells.</li>
+      <li>Set <b>Type if not given</b> and <b>Unit if not given</b> for lines that leave them out. Keep <b>Name boards by room and type</b> ticked to get names like Room 401 Whiteboard.</li>
+      <li>Read the preview on the right, then press the add button under it. Board Remote connects to every new board right away.</li>
+    </ol>
+    <table>
+      <thead><tr><th>Your list looks like</th><th>Board Remote makes</th></tr></thead>
+      <tbody>
+        <tr><td>A header row: Room, Whiteboard IP, Door sign IP, Unit, Closet (any order)</td><td>A whiteboard and a door sign for each room</td></tr>
+        <tr><td>A header row: Room, Type, IP</td><td>One device per line, of that type</td></tr>
+        <tr><td><code>401, 10.20.4.11</code></td><td>One device of the default type in room 401</td></tr>
+        <tr><td><code>401, 10.20.4.11, 10.20.4.111</code></td><td>A whiteboard, then a door sign, in room 401</td></tr>
+        <tr><td><code>Room 402 door sign 10.20.4.112</code></td><td>A door sign in room 402</td></tr>
+        <tr><td><code>Nurse station, unit status board, 10.20.4.200</code></td><td>A Unit Status Board</td></tr>
+      </tbody>
+    </table>
+    <p>Each preview line says <b>New</b>, <b>Update</b> (and what changes), <b>New address</b> (same room and type on a new IP; its history is kept), <b>No change</b>, or <b>Skipped</b> with the reason: not an IP, no room, or an IP already on another line. Download a template gives a CSV with the usual columns.</p>
+
+    <h3 id="push">Push an app</h3>
+    <figure><img src="/manual/push.webp" alt="Push an app"><figcaption>Push an app: a door sign push finished, with one board signed with a different key.</figcaption></figure>
+    <ol>
+      <li>Drop the APK into the <b>App library</b>. Board Remote reads its name, package, version, the Android it needs and the processors it is built for. <b>HCI ONE ADB</b> is already there.</li>
+      <li>Pick the app. When its <b>For</b> type is set (for example Door signs), the table shows those boards and selects them all. Change the selection with the type buttons, the unit list, the search box or the check boxes.</li>
+      <li><b>Check versions</b> shows what each board runs now: current, older, newer or not installed.</li>
+      <li><b>Push</b>. Each row shows its step (Connecting, Checking, Sending, Installing, Checking version, Opening) and ends with its result.</li>
+      <li>Fix what a failed row says, then <b>Retry</b> the failed boards.</li>
+    </ol>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Skip boards already on this version</td><td>On</td><td>Boards that are current are left alone</td></tr>
+        <tr><td>Open the app when it is installed</td><td>On</td><td>Opens it, then checks it is running</td></tr>
+        <tr><td>Grant its permissions</td><td>On</td><td>Android 6 and newer</td></tr>
+        <tr><td>Watch this app in Device health</td><td>On</td><td>Makes it the board's watched app</td></tr>
+        <tr><td>Allow an older version to replace a newer one</td><td>Off</td><td>For a deliberate downgrade</td></tr>
+        <tr><td>Boards at a time</td><td>6</td><td>Up to 16. Lower it on a slow network.</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>A failed row says</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>Board has a newer version</td><td>Tick Allow an older version, or leave that board</td></tr>
+        <tr><td>Android too old for this app</td><td>That board needs a newer Android or a different build</td></tr>
+        <tr><td>Built for another processor</td><td>Ask for a build for that board's processor</td></tr>
+        <tr><td>Board storage is full</td><td>Device health, Free up storage, then Retry</td></tr>
+        <tr><td>Signed with a different key</td><td>Remove and install on that row. It clears that app's data on that board.</td></tr>
+        <tr><td>Waiting for Allow on the board</td><td>Tap Allow at the board, then Retry</td></tr>
+        <tr><td>Not reachable</td><td>Power, network, or network ADB is off. Check Device health.</td></tr>
+        <tr><td>Board blocked the install</td><td>On the board, turn off Verify apps over USB</td></tr>
+      </tbody>
+    </table>
+    <p><b>HCI ONE ADB</b> comes with Board Remote and stays in the library. Pushing it installs and starts the keeper, then returns the screen to the board's own app. It never becomes the watched app.</p>
+
+    <h3 id="roomsign">Room signs</h3>
+    <p><b>HCI ONE Room Sign</b> is a standalone door sign: it fills the screen with one room number and nothing else, keeps it through reboots, and needs no server and no patient data. It comes with Board Remote and is already in the app library. Use it where a sign should simply show its room, whether or not the site runs MediaCare.</p>
+    <ol>
+      <li>Push it like any app: pick <b>HCI ONE Room Sign</b>, select the door signs, <b>Push</b>. It is set to the <b>Door signs</b> type, so picking it selects them for you.</li>
+      <li>With it still picked, <b>Set the room on each sign</b> appears on the right. Each sign takes the room from its line on the Boards page, so get the room list right first (the room list import, or type it on a board's card).</li>
+      <li>Select the signs and click <b>Set the room on ... signs</b>. Each row shows its result; signs with no room on the Boards page are counted and skipped until you set one.</li>
+      <li>Fix what a failed row says, then <b>Retry</b> the failed signs.</li>
+    </ol>
+    <table>
+      <thead><tr><th>A failed row says</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>No room set for this board</td><td>Set its room on the Boards page, then Set the room again</td></tr>
+        <tr><td>HCI ONE Room Sign is not on this board</td><td>Push the app to it first, then set the room</td></tr>
+        <tr><td>Waiting for Allow on the board</td><td>Tap Allow at the board, then Retry</td></tr>
+        <tr><td>Not reachable</td><td>Power, network, or network ADB is off. Check Device health.</td></tr>
+      </tbody>
+    </table>
+    <p>A sign can also be set by hand: long press anywhere on it and type the room. The number lives on the device, so the sign shows it again after a power cut with nothing to set up. Room Sign and <b>Rooms in MediaCare</b> below are independent: use the sign app where the board shows its own number, and MediaCare where the apps read the room from a MediaCare record.</p>
+
+    <h3 id="mediacare">Rooms in MediaCare</h3>
+    <p>Each door sign and whiteboard gets its room from MediaCare, so Deploy writes the room from your list into each device's MediaCare record.</p>
+    <figure><img src="/manual/rooms.webp" alt="Rooms in MediaCare"><figcaption>Rooms in MediaCare after Test on one: the change for each device, ready to apply to the rest.</figcaption></figure>
+    <h4>Link MediaCare once</h4>
+    <ol>
+      <li><b>Rooms in MediaCare</b>. On the left enter MediaCare's Kuzzle address (for example <code>http://10.20.0.5:7512</code>) and a login that can change device records. Add a Kong API key only if MediaCare needs one, and tick <b>Trust its certificate</b> for an https address with its own certificate. <b>Save and connect</b>.</li>
+      <li><b>Find device records</b>. Board Remote reads each board's MAC, serial and IP over ADB, finds the MediaCare records that carry them, and picks the room field: a link to a room record, the room number as text in MediaCare's format (for example Room {room}), or both.</li>
+      <li>Check the choices under <b>Device records</b>, change any by hand, then <b>Save fields</b>.</li>
+    </ol>
+    <h4>Set the rooms</h4>
+    <ol>
+      <li>Select the boards: a whole unit, or one type.</li>
+      <li><b>Preview the changes</b>. Each row shows the MediaCare record, its room now and the change.</li>
+      <li><b>Test on one</b>. Board Remote writes that record, reads it back and restarts the app. Look at that board's screen.</li>
+      <li><b>Apply to the other</b> devices.</li>
+      <li><b>Undo</b> puts back the old rooms of the last batch.</li>
+    </ol>
+    <table>
+      <thead><tr><th>A row says</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>No MediaCare record has MAC address ...</td><td>The device has not registered with MediaCare yet. Check its server setting, then Preview again.</td></tr>
+        <tr><td>2 MediaCare records have ...</td><td>Delete the extra record in MediaCare</td></tr>
+        <tr><td>MediaCare has no room 412</td><td>Add the room in MediaCare first</td></tr>
+        <tr><td>2 rooms in MediaCare are called 412. Pick one.</td><td>Pick the right one in that row</td></tr>
+        <tr><td>... also has this room in MediaCare</td><td>Another device of the same type still holds that room. Clear it if that device is gone.</td></tr>
+        <tr><td>Not reachable, so its MAC address cannot be read yet</td><td>Bring the board online, then Preview again</td></tr>
+      </tbody>
+    </table>
+    <p>Board Remote reads only device and room records, and never opens collections that look like patient or staff data. <b>Rooms CSV</b> in the top bar downloads every room, IP, MAC and serial for anyone setting rooms by hand.</p>
+
+    <h2 id="settings">Appendix G. Settings and alerts</h2>
+    <p>All settings are under the gear on Device health. Without a Teams link, alerts are only logged in Board Remote and shown as pop ups on this PC.</p>
+    <table>
+      <thead><tr><th>Setting</th><th>What it does</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td>Site name</td><td>Shown in the header and in every alert</td><td>Demo lab</td></tr>
+        <tr><td>HCI ONE server</td><td>Each board checks it can reach this server; a failure shows in the check chain</td><td>Blank, not checked</td></tr>
+        <tr><td>Teams link for HCI Support</td><td>Where HCI Support alerts go</td><td>Blank</td></tr>
+        <tr><td>Teams link for Hospital IT</td><td>Where Hospital IT alerts go. Blank sends them to the HCI Support channel.</td><td>Blank</td></tr>
+        <tr><td>Offline after (seconds)</td><td>Missed heartbeats before a board counts as offline</td><td>90</td></tr>
+        <tr><td>Escalate after (minutes)</td><td>An alert nobody acknowledged goes to both owners</td><td>5</td></tr>
+        <tr><td>Clock off by more than (seconds)</td><td>When a clock difference becomes a fault</td><td>60</td></tr>
+        <tr><td>Look for new devices every (minutes)</td><td>Network sweep for New devices. 0 turns it off.</td><td>5</td></tr>
+        <tr><td>Time server for Sync clock</td><td>The time server Sync clock uses</td><td>Blank</td></tr>
+        <tr><td>Pop up on this PC when an alert goes out</td><td>A Windows pop up for every alert</td><td>On</td></tr>
+        <tr><td>Claude API key</td><td>Turns on Diagnose with Claude</td><td>Blank</td></tr>
+        <tr><td>Claude model</td><td>The Claude model used</td><td>claude-sonnet-5-5</td></tr>
+        <tr><td>Include log lines I pulled</td><td>Sends pulled logs to Claude. Off, because logs can contain patient details.</td><td>Off</td></tr>
+        <tr><td>Door sign LED command</td><td>The ADB command LED bezel sends; {color} and {mode} are filled in from the console</td><td>Broadcast to HCI ONE Room Sign</td></tr>
+      </tbody>
+    </table>
+    <p><b>Send a test alert</b> posts to each Teams link and shows a pop up, so you can confirm both channels before a real outage.</p>
+    <h4>Get a Teams link</h4>
+    <ol>
+      <li>In Teams, open the channel that should get the alerts, then More options (the three dots) and <b>Workflows</b>.</li>
+      <li>Pick <b>Post to a channel when a webhook request is received</b>, check the team and channel, and add the workflow.</li>
+      <li>Copy the link it gives you and paste it into Settings. Repeat for the Hospital IT channel.</li>
+    </ol>
+    <h4>Who gets told, and when</h4>
+    <table>
+      <thead><tr><th>When</th><th>Who is told</th></tr></thead>
+      <tbody>
+        <tr><td>A board misses heartbeats for 90 s</td><td>The owner the first read names (HCI Support or Hospital IT), plus a pop up on this PC</td></tr>
+        <tr><td>Still down after 5 minutes and nobody acknowledged</td><td>Escalates to Hospital IT and HCI Support</td></tr>
+        <tr><td>3 or more boards in one closet or network drop within 2 minutes</td><td>Hospital IT, one grouped alert instead of one per board. It stays open until the last board is back.</td></tr>
+        <tr><td>The app crashes 3 times in 10 minutes</td><td>HCI Support, right away</td></tr>
+        <tr><td>Clock off, app not running or behind, crash dialog, screen asleep, storage under 5%</td><td>HCI Support, after 2 checks in a row (about 1 minute)</td></tr>
+        <tr><td>The problem clears</td><td>An all clear to everyone who was told</td></tr>
+        <tr><td>A new device answers on port 5555</td><td>HCI Support. It waits in New devices until someone claims it.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="trouble">Appendix H. Troubleshooting</h2>
+    <p>Start with Device health: its check chain and first read already name most causes. What it cannot see is below. Board Remote writes what it did to <code>logs\boardremote.log</code> in its folder.</p>
+    <table>
+      <thead><tr><th>What you see</th><th>Likely cause</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>START.bat says Board Remote did not start</td><td>Node or the tools folder is missing</td><td>Run SETUP.bat again, then look in the logs folder</td></tr>
+        <tr><td>The window says Board Remote is not running</td><td>The background service was stopped</td><td>Double click START.bat</td></tr>
+        <tr><td>The Boards footer says adb missing</td><td>The tools download did not finish</td><td>Run SETUP.bat on a PC with internet</td></tr>
+        <tr><td>A board says Approve on board</td><td>Allow was never tapped, or the PC changed</td><td>Tap Allow at the board with Always allow ticked</td></tr>
+        <tr><td>Not reachable, and Device health says network ADB is off</td><td>The board is on, but network ADB turned off, often after a reboot</td><td>USB to WiFi at that board, then push HCI ONE ADB to it</td></tr>
+        <tr><td>Not reachable with no answer at all</td><td>Power, cable or switch port</td><td>Check power and the network jack. If its neighbours are down too, it is the closet.</td></tr>
+        <tr><td>A whole closet is red</td><td>A switch or closet problem</td><td>Hospital IT, using the closet alert</td></tr>
+        <tr><td>Snapshots instead of live video</td><td>Android older than 5, or scrcpy missing</td><td>Run SETUP.bat. Older boards stay on snapshots.</td></tr>
+        <tr><td>Clock off, sign ins refused on the board</td><td>The board cannot reach a time server</td><td>Sync clock, and ask IT for NTP (UDP 123)</td></tr>
+        <tr><td>The app keeps crashing</td><td>A problem in the app</td><td>Restart app, Pull logs, Diagnose with Claude, then send to HCI</td></tr>
+        <tr><td>Teams alerts do not arrive</td><td>The link is wrong or the workflow is off</td><td>Send a test alert. The delivery chip shows failed and why.</td></tr>
+        <tr><td>A push failed on some boards</td><td>See the failed row's reason</td><td><a href="#push">Appendix F, Push an app</a></td></tr>
+        <tr><td>Not found in MediaCare</td><td>The device has not registered with MediaCare</td><td>Check its server setting, then Preview again</td></tr>
+        <tr><td>Android Studio and Board Remote disconnect each other</td><td>Two different adb versions</td><td>Board Remote already uses Android Studio's adb when it is installed. Close both, then start Board Remote.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="security">Appendix I. Security, privacy and files</h2>
+    <p>Board Remote keeps its secrets in one file, boards.json, and never sends patient information anywhere.</p>
+    <ul>
+      <li><b>Only this PC</b> can open the dashboard (localhost:7755). Other PCs and web pages cannot reach it.</li>
+      <li><b>Each board trusts this PC</b> only after someone at the board taps Allow and checks the key fingerprint.</li>
+      <li><b>boards.json</b> holds the Teams links, the Claude key and the MediaCare login. Keep it private, back it up, and never email it.</li>
+      <li><b>No patient data leaves.</b> Claude never receives screenshots, and gets log lines only when Settings allows it. In MediaCare, Board Remote reads only device and room records.</li>
+      <li><b>The keeper's signing key</b> stays with HCI. A manufacturer gets only the signed HCI ONE ADB app.</li>
+    </ul>
+    <table>
+      <thead><tr><th>File or folder</th><th>Holds</th><th>In the zip</th></tr></thead>
+      <tbody>
+        <tr><td>server.js, health.js, deploy.js, public</td><td>The program and this manual</td><td>Yes</td></tr>
+        <tr><td>apks\HCI_ONE_ADB.apk</td><td>The HCI ONE ADB keeper</td><td>Yes</td></tr>
+        <tr><td>tools</td><td>Node (if needed), adb and scrcpy</td><td>No, SETUP makes it</td></tr>
+        <tr><td>boards.json</td><td>Boards and settings, including the secrets above</td><td>No</td></tr>
+        <tr><td>health.json</td><td>Heartbeat history, issues and alerts</td><td>No</td></tr>
+        <tr><td>deploy.json</td><td>App library list, push history and room changes kept for undo</td><td>No</td></tr>
+        <tr><td>apks\library</td><td>The APKs added to the library</td><td>No</td></tr>
+        <tr><td>remote.json</td><td>What HCI did here through Remote</td><td>No</td></tr>
+        <tr><td>logs</td><td>What Board Remote did</td><td>No</td></tr>
+      </tbody>
+    </table>
+    <p>To keep a setup, back up boards.json, deploy.json and apks\library. An upgrade never touches them.</p>
+
+    <h2 id="remote">Appendix J. Remote (proof of concept)</h2>
+    <p>HCI ONE Remote lets HCI support see and fix this site's boards from a phone or PC anywhere, the way TeamViewer reaches PCs. This PC dials out to an HCI relay; nothing at the hospital is opened to the internet. This version is a proof of concept for demo boards only.</p>
+    <h4>Set it up</h4>
+    <ol>
+      <li>Click <b>Remote</b> at the bottom of the Boards page.</li>
+      <li>Enter the relay address HCI gives you, enter the one time code from HCI, then <b>Connect this site</b>. The code works once, within 24 hours.</li>
+    </ol>
+    <p><b>Connecting is the consent.</b> The hospital gives HCI permission for ongoing remote support in the install agreement, and connecting the site with HCI's code is that permission in action. From then on HCI has the access below on every board, nobody here is asked again, and Remote stays on, also after a restart, until HCI disconnects the site. A <b>Remote</b> tab then stays in the navigation on every page.</p>
+    <table>
+      <thead><tr><th>Access</th><th>What HCI can do</th></tr></thead>
+      <tbody>
+        <tr><td>Health</td><td>Board status, heartbeat and open issues</td></tr>
+        <tr><td>Fixes</td><td>Restart app, Reboot and Wake screen</td></tr>
+        <tr><td>Live view</td><td>The board's live screen with touch, Back and Home</td></tr>
+      </tbody>
+    </table>
+    <p>The hospital always sees HCI's access. While HCI is viewing a board, a bar at the top of every Board Remote page says who and which board, with <b>End</b>, so anyone here can stop a session. The Remote page lists every action under Activity. To move a site to another relay, HCI removes it in the viewer's Admin and makes a new code.</p>
+    <p><b>Nothing shows on the boards.</b> These signs of remote access appear only here, on the Board Remote PC. No notice of remote access ever appears on a whiteboard or door sign. Whether and how patients are told about in room devices stays hospital policy, the same as for any other monitoring.</p>
+    <p><b>The relay</b> is a separate HCI server, where HCI signs in to its web viewer from any phone or PC. Board Remote reaches it over https (port 443) only. A copy is in the relay folder for testing on one PC: RELAY.bat starts it on port 8780. See relay\README.txt.</p>
+    <p><b>Before real patient sites:</b> Microsoft single sign on with multifactor, video encrypted end to end, access by role per site, and a security review.</p>
+  </article>
+  
+    <h2 id="audit">Appendix K. Morning audit</h2>
+    <p>The Audit view gives hard evidence of what was on each room screen, so a report that an infotile "fell off" can be checked against the record instead of a memory. It does three things.</p>
+    <ul>
+      <li><b>Overnight record.</b> Every minute each board with a room is checked. A board counts as down once Device health misses its heartbeat, dated from its last heartbeat, so the report shows exactly when it dropped and when it came back. If Board Remote itself was not running, the report says so, rather than claiming a board was up when nobody was watching.</li>
+      <li><b>Morning run.</b> Every morning at the set time (6:30 by default), and whenever you press <b>Run audit now</b>, each audited board gets a snapshot and Board Remote reads the words on its screen. It keeps only whether a fall risk or contact tile was showing. The words themselves, which can include patient names, are never saved. If this PC was off at the set time, the audit runs when it comes back, up to three hours late.</li>
+      <li><b>The hospital's list.</b> Each morning the hospital sends the rooms that should show fall risk and the rooms that should show contact, room numbers only. Paste it, choose the file, or drop it into the audit\inbox folder. Any of these work: a table with Room, Fall risk and Contact columns; lines like "Fall risk: 401, 405"; or a heading followed by one room per line. Dates and times on the list are ignored.</li>
+    </ul>
+    <p>The report then compares the list with the screens, room by room. <b>Missing on screen</b> means the list says the tile should be there and no board in the room showed it. <b>On screen, not on the list</b> means a tile showed that the list does not call for. <b>Could not check</b> means the board was not connected or its screen text could not be read; open the room to see its snapshot. Click a room for its snapshot, the tiles that were read and its overnight drops. <b>Report CSV</b> saves the day as a spreadsheet, and History keeps every day for 90 days. With a Teams link set under Device health, a short summary with room numbers goes to HCI Support after each run, and again when the list arrives later.</p>
+    <p>A tile counts only when a piece of text on the screen is exactly one of the tile words in Settings, so "Contact your nurse" never counts as a contact tile. If a hospital's tiles use other words, add them there. Which board types are audited (whiteboards and door signs by default) is set there too.</p>
+    <h2 id="cloud">Appendix L. HCI ONE Cloud</h2>
+    <p>HCI ONE Cloud puts every Board Remote PC at a hospital into one web dashboard, so several techs can work the same hospital and hospital IT can see and fix boards from a browser. Joining is optional. Board Remote works the same without it.</p>
+    <ul>
+      <li><b>Join.</b> In the web dashboard, go to <b>PCs</b>, <b>Make a code</b>. On this PC open <b>Remote</b>, and under <b>HCI ONE Cloud</b> enter the code (the address is already filled in: https://remote.hci-tv.com). A code works once and lasts 24 hours.</li>
+      <li><b>One board, many PCs.</b> Boards are matched by MAC address or serial, so a board two PCs can reach shows once. Commands go through the PC that heard from it most recently. If that PC goes off, the next one takes over.</li>
+      <li><b>Rooms sync both ways.</b> A room, unit or closet changed here shows in the web dashboard and on the other PCs within seconds, and the reverse. The most recent change wins, field by field.</li>
+      <li><b>The HCI lock.</b> Once HCI locks a board's location, its room, unit and closet cannot be changed here or in the web dashboard. Edit shows "HCI locked the room, unit and closet". The name, address and app can still be changed.</li>
+      <li><b>What leaves this PC.</b> The board list (identity, room, unit, closet, type, model) and health (state, headline, last heartbeat). <b>Never</b> screens, snapshots, screen text or device logs.</li>
+      <li><b>Commands from the web.</b> Only the fixed list: restart app, reboot, wake, fix clock, free storage, reconnect ADB, install the keeper, door sign light, health check and the morning audit. They run through this PC's own Board Remote exactly as if clicked here, and each one is logged in both places.</li>
+      <li><b>Leave.</b> <b>Leave the cloud</b> on the Remote view, then remove the PC under PCs in the web dashboard.</li>
+    </ul>
+    <p>The connection goes out from this PC on port 443 only. Nothing is opened to the internet.</p>
+    <h2 id="winapp">Appendix M. Windows app and updates</h2>
+    <p>From 2.1, Board Remote installs with <b>HCI-ONE-Board-Remote-Setup.exe</b> and runs as a Windows service. It starts with Windows (no one has to sign in), restarts itself if it stops, and installs new versions from HCI ONE Cloud. Open it with the <b>Board Remote</b> icon on the desktop or in the Start menu.</p>
+    <ul>
+      <li><b>Moving from a folder install.</b> Run the installer on that PC. It stops the old Board Remote, removes its start with Windows shortcut, and brings over the boards, settings, cloud link, health and push history, app library, audit records and snapshots. The old folder is left as it was; delete it once the new one looks right.</li>
+      <li><b>Where things are.</b> The program is in C:\Program Files\HCI ONE\Board Remote. Your boards and everything Board Remote records are in C:\ProgramData\HCI ONE\Board Remote, readable only by Windows administrators and the service, because that is where the MediaCare login and the cloud link are kept.</li>
+      <li><b>Updates.</b> A PC joined to HCI ONE Cloud checks for a new version every 15 minutes. If its hospital is on automatic, it installs between 2 and 5 am; if the hospital approves updates, it waits until someone clicks <b>Approve</b> on the PCs page. <b>Install now</b> there skips the wait.</li>
+      <li><b>Safety.</b> Every version is signed by HCI, and this PC checks that signature itself before installing. The new version is installed beside the running one; if it does not start and answer within two minutes, the PC goes straight back to the version it had and reports it, and does not try that version again unless someone approves it.</li>
+      <li><b>Mirror and Shell.</b> A service has no desktop of its own, so the separate scrcpy mirror window and the adb shell window cannot open from it. Click a board for Live view with touch instead; Shell shows the command to paste into a Command Prompt.</li>
+    </ul>
+</main>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const read = document.getElementById('read');
+  const links = Array.from(document.querySelectorAll('#toc a'));
+  const go = id => { const el = document.getElementById(id); if (el) el.scrollIntoView({ block: 'start' }); };
+  links.forEach(a => a.addEventListener('click', e => { e.preventDefault(); const id = a.getAttribute('href').slice(1); history.replaceState(null, '', '#' + id); go(id); }));
+  document.querySelectorAll('.doc a[href^="#"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); const id = a.getAttribute('href').slice(1); history.replaceState(null, '', '#' + id); go(id); }));
+  // the contents follow the reading position
+  const heads = links.map(a => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+  const mark = () => {
+    const y = read.getBoundingClientRect().top + 40;
+    let cur = heads[0];
+    for (const h of heads) if (h.getBoundingClientRect().top <= y) cur = h;
+    links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + cur.id));
+  };
+  read.addEventListener('scroll', () => requestAnimationFrame(mark), { passive: true });
+  window.addEventListener('load', () => { if (location.hash) go(location.hash.slice(1)); mark(); });
+  window.addEventListener('hashchange', () => go(location.hash.slice(1)));
+  document.getElementById('btnPrint').onclick = () => window.print();
+  document.getElementById('btnBack').onclick = () => { if (history.length > 1) history.back(); else location.href = '/'; };
+  mark();
+})();
+</script>
+<script src="/remote-banner.js"></script>
+</body>
+</html>

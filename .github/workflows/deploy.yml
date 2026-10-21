@@ -29,6 +29,9 @@ jobs:
       - name: Unit and database tests
         env: { PGHOST: localhost, PGUSER: postgres, PGPASSWORD: ci }
         run: npm test
+      - name: Service updates Board Remote, end to end
+        env: { PGHOST: localhost, PGUSER: postgres, PGPASSWORD: ci }
+        run: node test/e2e/update.js
   deploy:
     needs: test
     if: vars.CONTAINER_APP != ''

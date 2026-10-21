@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploy · Board Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231E1C19'/%3E%3Cpath d='M12 16V6M8 10l4-4 4 4' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ground:#F2EFE9; --card:#FFFFFF; --soft:#F6F4EF; --line:#E7E2D9;
+  --ink:#1E1C19; --ink2:#3A3733; --muted:#7A766F;
+  --green:#14A44D; --green-bg:#E2F4E8;
+  --amber:#C98204; --amber-bg:#FCF0D6;
+  --red:#D93A2F;   --red-bg:#FBE4E1;
+  --blue:#2563EB;  --blue-bg:#E3EBFD;
+  --grey:#8C877F;  --grey-bg:#ECE8E1;
+  --r:16px; --g:16px;
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --colL:340px; --colR:380px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ground);color:var(--ink);font:500 14px/1.4 var(--font);display:grid;grid-template-rows:auto 1fr;gap:var(--g);padding:var(--g);overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+a{color:inherit}
+.label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+[hidden]{display:none!important}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--soft);font-weight:700;font-size:13px;white-space:nowrap;transition:background .15s, transform .05s;text-decoration:none}
+.btn:hover{background:var(--grey-bg)}
+.btn:active{transform:translateY(1px)}
+.btn.dark{background:var(--ink);color:#fff}
+.btn.dark:hover{background:#34312c}
+.btn.green{background:var(--green);color:#fff}
+.btn.danger{color:var(--red)}
+.btn.sm{height:32px;padding:0 12px;font-size:12px;border-radius:10px}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.link{font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:12px}
+.link:hover{color:var(--ink)}
+
+/* top bar (same as Boards) */
+.top{background:var(--card);border-radius:var(--r);padding:10px 14px;display:grid;grid-template-columns:auto auto 1fr auto;gap:18px;align-items:center}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:40px;height:40px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.brand .mark svg{width:22px;height:22px}
+.brand .kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.nav{display:inline-flex;padding:4px;border-radius:999px;background:var(--soft);gap:2px}
+.nav a{height:34px;padding:0 14px;border-radius:999px;color:var(--muted);font-weight:800;font-size:13px;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;text-decoration:none}
+.nav a.on{background:var(--ink);color:#fff}
+.nav a svg{width:14px;height:14px}
+.nav .cnt{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11px;display:inline-grid;place-items:center}
+.actions-top{display:flex;gap:8px}
+@media (max-width:1560px){.actions-top .btn span{display:none}.actions-top .btn{padding:0 12px}}
+
+/* three columns */
+.dgrid{min-height:0;display:grid;grid-template-columns:var(--colL) minmax(0,1fr) var(--colR);gap:var(--g)}
+@media (max-width:1440px){:root{--colL:310px;--colR:340px}}
+.col{min-height:0;display:grid;gap:var(--g);align-content:start;grid-auto-rows:min-content;overflow:auto}
+.col.left{grid-template-rows:auto minmax(0,1fr);align-content:stretch;overflow:hidden}
+.card{background:var(--card);border-radius:var(--r);padding:16px;display:grid;gap:12px;align-content:start;min-height:0}
+.card h2{margin:0;font-size:16px;font-weight:800}
+.card .hrow{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.scroll{overflow:auto;min-height:0}
+
+/* room list card */
+.rl-top{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.big{font-size:28px;font-weight:800;line-height:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-weight:700;font-size:11.5px;background:var(--soft);color:var(--ink2);white-space:nowrap}
+.chip b{font-weight:800}
+.chip.ok{background:var(--green-bg);color:#0d7a38}
+.chip.warn{background:var(--amber-bg);color:#8a5a00}
+.chip.bad{background:var(--red-bg);color:#a82a22}
+.chip.info{background:var(--blue-bg);color:var(--blue)}
+
+/* library */
+.lib{display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:12px;min-height:0}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:14px;text-align:center;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;transition:border-color .15s, background .15s;display:grid;gap:4px;place-items:center}
+.drop:hover,.drop.on{border-color:var(--ink);background:var(--soft);color:var(--ink)}
+.drop .pbar{width:100%;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.drop .pbar i{display:block;height:100%;background:var(--ink);width:0}
+.apps{display:grid;gap:8px;align-content:start;overflow:auto;min-height:0}
+.app{display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:center;text-align:left;background:var(--soft);border-radius:12px;padding:10px;border:2px solid transparent}
+.app:hover{background:var(--grey-bg)}
+.app.on{border-color:var(--ink);background:#fff}
+.app .ico{width:40px;height:40px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+.app .ico.ds{background:#6D4AFF}.app .ico.wb{background:var(--blue)}.app .ico.tv{background:#0E8A7A}
+.app .t{font-weight:800;font-size:14px;line-height:1.2}
+.app .v{font-weight:800}
+.app .p{font:600 11px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty-note{font-size:13px;color:var(--muted);padding:6px 2px}
+
+/* MediaCare link */
+.form{display:grid;gap:10px}
+.f{display:grid;gap:4px}
+.f > span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.in,.sel{height:38px;border-radius:10px;border:2px solid var(--line);padding:0 10px;font:600 13px var(--font);color:var(--ink);background:#fff;outline:0;width:100%;min-width:0}
+.in:focus,.sel:focus{border-color:var(--ink)}
+.in.mono{font-family:var(--mono);font-size:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk{display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:13px;cursor:pointer}
+.chk input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--ink);flex:none}
+.chk small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+.status{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13px}
+.status .d{width:10px;height:10px;border-radius:50%;background:var(--grey);flex:none}
+.status.ok .d{background:var(--green);box-shadow:0 0 0 4px var(--green-bg)}
+.status.warn .d{background:var(--amber);box-shadow:0 0 0 4px var(--amber-bg)}
+.map{background:var(--soft);border-radius:12px;padding:12px;display:grid;gap:10px}
+.eq{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
+.eq b{color:var(--muted);font-size:12px}
+.sep{border:0;border-top:1px solid var(--line);margin:2px 0}
+
+/* device table */
+.tcard{background:var(--card);border-radius:var(--r);display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;min-height:0;overflow:hidden}
+.tbar{display:flex;gap:10px;align-items:center;padding:12px 14px;flex-wrap:wrap}
+.mode{display:inline-flex;background:var(--soft);border-radius:12px;padding:3px;gap:2px}
+.mode button{height:34px;padding:0 14px;border-radius:10px;font-weight:800;font-size:13px;color:var(--muted);display:inline-flex;gap:8px;align-items:center}
+.mode button.on{background:var(--ink);color:#fff}
+.mode button svg{width:15px;height:15px}
+.tbar .grow{flex:1}
+.filters{display:flex;gap:6px;align-items:center;padding:0 14px 10px;flex-wrap:wrap}
+.fchip{height:30px;padding:0 12px;border-radius:999px;background:var(--soft);font-weight:700;font-size:12px;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
+.fchip b{font-weight:800}
+.fchip.on{background:var(--ink);color:#fff}
+.filters .sel{height:30px;width:auto;border-width:1px;font-size:12px}
+.filters .in{height:30px;width:150px;border-width:1px;font-size:12px}
+.rows{overflow:auto;min-height:0;border-top:1px solid var(--line)}
+.tr{display:grid;grid-template-columns:34px 76px minmax(150px,1.2fr) 118px 14px minmax(110px,.8fr) minmax(170px,1.4fr);gap:10px;align-items:center;padding:0 14px;min-height:46px;border-bottom:1px solid var(--soft)}
+.tr.th{position:sticky;top:0;background:#fff;z-index:1;min-height:36px;border-bottom:1px solid var(--line)}
+.tr.th > *{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tr:not(.th):hover{background:#FBFAF7}
+.tr.off{opacity:.55}
+.ck{display:grid;place-items:center;height:100%;cursor:pointer}
+.ck input{width:16px;height:16px;accent-color:var(--ink);cursor:pointer}
+.rm b{display:block;font-size:15px;font-weight:800;line-height:1.1}
+.rm span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm{min-width:0;display:grid;gap:2px}
+.nm .t{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm .s{font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden}
+.nm .s .m{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.kp{height:18px;padding:0 7px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.04em;display:inline-flex;align-items:center;background:var(--grey-bg);color:var(--ink2);flex:none}
+.kp.ds{background:#ECE6FF;color:#5A39E0}.kp.wb{background:var(--blue-bg);color:var(--blue)}.kp.tv{background:#DDF3EF;color:#0E7A6C}
+.ipc{font:600 12px var(--mono);color:var(--ink2)}
+.sd{width:10px;height:10px;border-radius:50%;background:var(--grey)}
+.sd.ok{background:var(--green)}.sd.warn{background:var(--amber)}.sd.bad{background:var(--red)}.sd.info{background:var(--blue);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.ca,.cb{min-width:0;font-size:12px;font-weight:600}
+.cb{display:flex;gap:8px;align-items:center}
+.cb .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+.tag{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap;background:var(--grey-bg);color:var(--ink2)}
+.tag.ok{background:var(--green-bg);color:#0d7a38}.tag.warn{background:var(--amber-bg);color:#8a5a00}.tag.bad{background:var(--red-bg);color:#a82a22}.tag.info{background:var(--blue-bg);color:var(--blue)}
+.t-ok{color:#0d7a38}.t-warn{color:#8a5a00}.t-bad{color:var(--red)}.t-info{color:var(--blue)}.t-mut{color:var(--muted)}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--blue-bg);border-top-color:var(--blue);animation:sp .8s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.arrow{color:var(--muted);font-weight:800;margin:0 4px}
+.cb .sel{height:28px;font-size:12px;border-width:1px;max-width:220px}
+.tfoot{display:flex;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.tfoot b{color:var(--ink)}
+.tfoot .grow{flex:1}
+.nobody{padding:40px 20px;text-align:center;color:var(--muted);display:grid;gap:12px;justify-items:center}
+.nobody h3{margin:0;color:var(--ink);font-size:18px}
+@container (max-width:0px){}
+@media (max-width:1440px){
+  .tr{grid-template-columns:30px 64px minmax(130px,1.2fr) 14px minmax(100px,.8fr) minmax(150px,1.4fr)}
+  .tr .ipc{display:none}
+}
+
+/* right panel */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.apphead{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:center}
+.apphead .ico{width:48px;height:48px;border-radius:12px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800}
+.apphead .ico.ds{background:#6D4AFF}.apphead .ico.wb{background:var(--blue)}.apphead .ico.tv{background:#0E8A7A}
+.apphead .t{font-size:17px;font-weight:800;line-height:1.2}
+.apphead .p{font:600 11px var(--mono);color:var(--muted)}
+.prog{height:10px;border-radius:99px;background:var(--soft);overflow:hidden;display:flex}
+.prog i{display:block;height:100%}
+.prog .g{background:var(--green)}.prog .r{background:var(--red)}.prog .s{background:var(--grey)}.prog .b{background:var(--blue);opacity:.5}
+.counts{display:flex;flex-wrap:wrap;gap:6px}
+.hist{display:grid;gap:6px}
+.hist .h{display:grid;grid-template-columns:1fr auto;gap:8px;font-size:12px;background:var(--soft);border-radius:10px;padding:8px 10px}
+.hist .h b{font-weight:800}
+.note{font-size:12.5px;color:var(--ink2);background:var(--soft);border-radius:12px;padding:10px 12px;line-height:1.45}
+.note.warn{background:var(--amber-bg);color:#6b4600}
+.note.ok{background:var(--green-bg);color:#0b5f2c}
+.steps{display:grid;gap:8px}
+.stp{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+.stp .n{width:26px;height:26px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:800;font-size:12px;color:var(--muted)}
+.stp.done .n{background:var(--green);color:#fff}
+.stp.cur .n{background:var(--ink);color:#fff}
+.stp .b{display:grid;gap:6px}
+.stp .b .x{font-size:12.5px;color:var(--muted)}
+
+/* dialog */
+dialog{border:0;border-radius:var(--r);padding:0;width:min(1180px,calc(100vw - 48px));max-height:calc(100vh - 48px);box-shadow:0 24px 64px rgba(30,28,25,.25);color:var(--ink);font:500 14px/1.4 var(--font)}
+dialog::backdrop{background:rgba(23,22,15,.45)}
+.dlg{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:min(780px,calc(100vh - 48px))}
+.dlg header{padding:20px 24px 12px;display:grid;gap:4px}
+.dlg header h2{margin:0;font-size:20px;font-weight:800}
+.dlg .body{display:grid;grid-template-columns:400px minmax(0,1fr);gap:16px;padding:0 24px;min-height:0}
+.dlg footer{display:flex;gap:10px;align-items:center;padding:16px 24px;border-top:1px solid var(--line)}
+.dlg footer .grow{flex:1;font-size:13px;color:var(--muted)}
+.dlg footer .grow b{color:var(--ink)}
+.paste{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;min-height:0}
+.paste textarea{width:100%;height:100%;min-height:220px;resize:none;white-space:pre;overflow:auto;tab-size:6;border:2px solid var(--line);border-radius:12px;padding:12px;font:500 12.5px/1.5 var(--mono);outline:0;background:#fff}
+.paste textarea:focus{border-color:var(--ink)}
+.paste textarea.on{border-color:var(--blue);background:var(--blue-bg)}
+.pv{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;background:var(--soft);border-radius:12px;overflow:hidden}
+.pv .ph{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;align-items:center}
+.pv .list{overflow:auto;min-height:0;background:#fff;border-top:1px solid var(--line)}
+.pr{display:grid;grid-template-columns:36px 70px 92px 128px minmax(90px,.7fr) minmax(160px,1.3fr);gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--soft);font-size:12.5px}
+.pr.th{position:sticky;top:0;background:#fff;font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+.pr .ln{color:var(--muted);font:600 11px var(--mono)}
+.pr .r{font-weight:800}
+.what{font-weight:700}
+.what.new{color:var(--green)}.what.update,.what.move{color:var(--blue)}.what.same{color:var(--muted)}.what.error{color:var(--red)}
+.what small{display:block;font-weight:600;color:var(--muted);font-size:11.5px}
+.pv-empty{padding:28px;color:var(--muted);font-size:13px;line-height:1.6}
+.pv-empty code{font-family:var(--mono);background:var(--soft);padding:2px 6px;border-radius:6px;font-size:12px}
+
+.toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:50;width:min(400px,calc(100vw - 32px))}
+.toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-weight:600;font-size:13px;white-space:pre-line;box-shadow:0 10px 30px rgba(0,0,0,.2);animation:tin .2s ease-out}
+.toast.err{background:var(--red)}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+</style>
+<style>html:not(.hci-remote-on) .navRemote{display:none!important}</style>
+<script>try{if(localStorage.getItem('hciRemoteOn'))document.documentElement.classList.add('hci-remote-on')}catch(e){}</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="mark"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
+  </div>
+  <nav class="nav" aria-label="Views">
+    <a href="/"><svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4"/></svg>Boards</a>
+    <a href="/health"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8l1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>Device health<span class="cnt" id="navIssues" hidden></span></a>
+    <a href="/health#new"><svg viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></svg>New devices<span class="cnt" id="navNew" hidden></span></a>
+    <a class="on" href="/deploy"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Deploy</a>
+    <a href="/audit"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Audit</a>
+    <a class="navRemote" href="/remote"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1"/></svg>Remote</a>
+  </nav>
+  <div></div>
+  <div class="actions-top">
+    <a class="btn" href="/api/deploy/rooms.csv" title="Rooms, IPs, MACs and serials as a CSV"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg><span>Rooms CSV</span></a>
+    <a class="btn" id="btnManual" href="/manual#deploy" title="Manual"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg><span>Manual</span></a>
+    <button class="btn dark" id="btnImport" title="Import a room list"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Import room list</span></button>
+  </div>
+</header>
+
+<main class="dgrid">
+  <section class="col left">
+    <div class="card" id="roomCard"></div>
+    <div class="card lib" id="libCard">
+      <div class="hrow"><h2>App library</h2><span class="label" id="libCount"></span></div>
+      <label class="drop" id="drop"><input type="file" id="file" accept=".apk" hidden multiple>
+        <span id="dropText">Drop an APK here or click to choose</span>
+        <span class="pbar" id="dropBar" hidden><i></i></span>
+      </label>
+      <div class="apps" id="apps"></div>
+    </div>
+    <div class="card scroll" id="mcCard" hidden></div>
+  </section>
+
+  <section class="tcard">
+    <div class="tbar">
+      <div class="mode" id="modeSeg">
+        <button data-mode="push"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Push an app</button>
+        <button data-mode="rooms"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>Rooms in MediaCare</button>
+      </div>
+      <span class="grow"></span>
+      <span class="muted" id="tbarInfo" style="font-size:12px;font-weight:600"></span>
+    </div>
+    <div class="filters" id="filters"></div>
+    <div class="rows" id="rows"></div>
+    <div class="tfoot" id="tfoot"></div>
+  </section>
+
+  <section class="col" id="right"></section>
+</main>
+
+<dialog id="dlgImport">
+  <div class="dlg">
+    <header>
+      <h2>Import a room list</h2>
+      <div class="muted" style="font-size:13px">Paste straight from Excel or type one line per room. Board Remote adds every device, names it by room and type, and connects to it.</div>
+    </header>
+    <div class="body">
+      <div class="paste">
+        <textarea id="impText" spellcheck="false" wrap="off" placeholder="Room&#9;Whiteboard IP&#9;Door sign IP&#9;Unit&#10;401&#9;10.20.4.11&#9;10.20.4.111&#9;4 West&#10;402&#9;10.20.4.12&#9;10.20.4.112&#9;4 West&#10;&#10;or simply:&#10;401, 10.20.4.11&#10;Room 402 door sign 10.20.4.112"></textarea>
+        <div class="form">
+          <div class="two">
+            <label class="f"><span>Type if not given</span><select class="sel" id="impKind"><option value="wb">Whiteboard</option><option value="ds">Door sign</option><option value="tv">Patient TV</option><option value="cam">Camera</option><option value="tab">Tablet</option><option value="usb">Unit Status Board</option></select></label>
+            <label class="f"><span>Unit if not given</span><input class="in" id="impUnit" placeholder="4 West" maxlength="40"></label>
+          </div>
+          <label class="chk"><input type="checkbox" id="impRename" checked><span>Name boards by room and type<small>Room 401 Whiteboard, Room 401 Door sign</small></span></label>
+          <div class="muted" style="font-size:12px">Drop a .csv file on the box, or <a class="link" id="impTemplate" href="#">download a template</a>. Columns can be Room, Whiteboard IP, Door sign IP, Type, IP, Unit, Closet, Name in any order.</div>
+        </div>
+      </div>
+      <div class="pv">
+        <div class="ph" id="impSummary"></div>
+        <div class="list" id="impList"></div>
+      </div>
+    </div>
+    <footer>
+      <span class="grow" id="impFoot">Nothing pasted yet.</span>
+      <button class="btn" id="impCancel">Cancel</button>
+      <button class="btn dark" id="impApply" disabled>Add to Boards</button>
+    </footer>
+  </div>
+</dialog>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const KINDS = { wb: 'Whiteboard', ds: 'Door sign', tv: 'Patient TV', cam: 'Camera', tab: 'Tablet', usb: 'Unit Status Board', other: 'Type not set' };
+const KPLURAL = { wb: 'Whiteboards', ds: 'Door signs', tv: 'Patient TVs', cam: 'Cameras', tab: 'Tablets', usb: 'Unit Status Boards', other: 'Type not set' };
+const KIND_ORDER = ['wb', 'ds', 'tv', 'cam', 'tab', 'usb', 'other'];
+const ROOMSIGN_PKG = 'com.hci.one.roomsign';
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : (many || one + 's'));
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* no storage */ } } };
+
+async function api(path, body) {
+  const init = { method: body === undefined ? 'GET' : 'POST', headers: { 'X-Board-Remote': '1' } };
+  if (body !== undefined) { init.body = JSON.stringify(body); init.headers['Content-Type'] = 'application/json'; }
+  try {
+    const r = await fetch(path, init);
+    const t = await r.text();
+    let j; try { j = JSON.parse(t); } catch (e) { j = { ok: r.ok, message: t }; }
+    if (j.ok === undefined) j.ok = r.ok;
+    return j;
+  } catch (e) { return { ok: false, message: 'Board Remote is not running. Double click START.bat.' }; }
+}
+function toast(msg, err) {
+  if (!msg) return;
+  const el = document.createElement('div');
+  el.className = 'toast' + (err ? ' err' : '');
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), err ? 9000 : 4500);
+}
+const report = j => { toast(j.message, !j.ok); return j; };
+function ago(ts) {
+  if (!ts) return '';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  if (s < 86400) return Math.round(s / 3600) + ' hr ago';
+  return Math.round(s / 86400) + ' days ago';
+}
+const secs = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s'; };
+const mb = n => n >= 1048576 ? (n / 1048576).toFixed(n >= 104857600 ? 0 : 1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+function statusCls(st) { return st === 'online' ? 'ok' : st === 'unauthorized' || st === 'offline' ? 'warn' : st === 'unreachable' ? 'bad' : st === 'connecting' || st === 'starting' ? 'info' : 'idle'; }
+const srcText = (m, k) => k === 'mac' ? 'MAC address' : k === 'androidId' ? 'Android ID' : String((m.sources || {})[k] || '').toLowerCase();
+const STATUS_TXT = { online: 'Connected', unauthorized: 'Approve on board', offline: 'Not responding', unreachable: 'Not reachable', disconnected: 'Disconnected', connecting: 'Connecting', starting: 'Connecting' };
+
+/* ---------- page state ---------- */
+let D = null;
+let mode = ls.get('br.deploy.mode', 'push') === 'rooms' ? 'rooms' : 'push';
+let appId = ls.get('br.deploy.app', '');
+let fKind = 'all', fUnit = '', fQ = '';
+const sel = new Set();
+let selReady = false;
+const opts = { skipSame: true, launch: true, grant: true, downgrade: false, watch: true, parallel: 6 };
+let restart = true;
+let picks = {};
+let testedJob = '', lastRoomsRunning = false, mcSig = '', mcFields = {}, previewFor = '', mcEdit = false;
+
+function app() { return D && D.apps.find(a => a.id === appId) || null; }
+function boardsShown() {
+  if (!D) return [];
+  const q = fQ.trim().toLowerCase();
+  return D.boards.filter(b => (fKind === 'all' || b.kind === fKind) && (!fUnit || (b.unit || '') === fUnit) &&
+    (!q || (b.room + ' ' + b.name + ' ' + b.host + ' ' + b.unit).toLowerCase().indexOf(q) >= 0));
+}
+function selected() { return D ? D.boards.filter(b => sel.has(b.id)) : []; }
+function setFilter(kind) {
+  fKind = kind;
+  sel.clear(); boardsShown().forEach(b => sel.add(b.id));
+  renderAll();
+}
+
+async function poll() {
+  const j = await api('/api/deploy');
+  if (!j || !j.boards) return;
+  D = j;
+  if (!selReady) {
+    selReady = true;
+    const a = app();
+    if (a && a.kind && D.boards.some(b => b.kind === a.kind)) fKind = a.kind;
+    boardsShown().forEach(b => sel.add(b.id));
+  }
+  for (const id of Array.from(sel)) if (!D.boards.some(b => b.id === id)) sel.delete(id);
+  if (!app() && D.apps.length) { appId = D.apps[0].id; }
+  const rj = D.jobs.rooms;
+  if (lastRoomsRunning && rj && !rj.running) { setTimeout(() => preview(true), 300); }
+  lastRoomsRunning = !!(rj && rj.running);
+  renderAll();
+}
+function renderAll() {
+  if (!D) return;
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $('#btnManual').href = '/manual#' + (mode === 'rooms' ? 'mediacare' : 'push');
+  $('#libCard').hidden = mode !== 'push';
+  $('#mcCard').hidden = mode !== 'rooms';
+  renderRoomCard();
+  if (mode === 'push') renderLib(); else renderMc();
+  renderFilters();
+  renderRows();
+  renderRight();
+}
+
+/* ---------- left: room list ---------- */
+function renderRoomCard() {
+  const rooms = new Set(D.boards.filter(b => b.room).map(b => (b.unit || '') + '|' + b.room)).size;
+  const kinds = {}; D.boards.forEach(b => { kinds[b.kind] = (kinds[b.kind] || 0) + 1; });
+  const units = Array.from(new Set(D.boards.map(b => b.unit).filter(Boolean)));
+  const noRoom = D.boards.filter(b => !b.room && b.kind !== 'usb').length;   // a Unit Status Board serves the whole unit, not a room
+  $('#roomCard').innerHTML =
+    '<div class="hrow"><h2>Room list</h2><a class="link" href="/">Boards page</a></div>' +
+    (D.boards.length
+      ? '<div class="rl-top"><div><div class="big">' + rooms + '</div><div class="muted" style="font-size:12px;font-weight:600">' + (rooms === 1 ? 'room' : 'rooms') + ' · ' + plural(D.boards.length, 'device') + (units.length ? ' · ' + esc(units.slice(0, 3).join(', ')) + (units.length > 3 ? ' and ' + (units.length - 3) + ' more' : '') : '') + '</div></div>' +
+        '<button class="btn sm" id="rcImport">Import</button></div>' +
+        '<div class="chips">' + KIND_ORDER.filter(k => kinds[k]).map(k => '<span class="chip"><b>' + kinds[k] + '</b> ' + esc((kinds[k] === 1 ? KINDS[k] : KPLURAL[k]).toLowerCase()) + '</span>').join('') + (noRoom ? '<span class="chip warn"><b>' + noRoom + '</b> without a room</span>' : '') + '</div>'
+      : '<div class="note">No boards yet. Import a list of rooms and IP addresses to build the Boards page.</div><button class="btn dark" id="rcImport">Import room list</button>');
+  $('#rcImport').onclick = openImport;
+}
+
+/* ---------- left: app library ---------- */
+const KABBR = { wb: 'WB', ds: 'DS', tv: 'TV', cam: 'CAM', tab: 'TAB', usb: 'USB' };
+function ico(a) {
+  const words = (a.label || a.pkg).replace(/^HCI\s+(ONE\s+)?/i, '').split(/[\s._]+/).filter(Boolean);
+  const t = a.builtin ? 'ADB' : KABBR[a.kind] || (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2));
+  return '<span class="ico ' + esc(a.kind || '') + '">' + esc(t.toUpperCase()) + '</span>';
+}
+function renderLib() {
+  $('#libCount').textContent = D.apps.length ? plural(D.apps.length, 'app') : '';
+  const el = $('#apps');
+  if (!D.apps.length) { el.innerHTML = '<div class="empty-note">Add the door sign and whiteboard APKs here. Board Remote reads the package and version from each file.</div>'; return; }
+  el.innerHTML = D.apps.map(a => '<button class="app' + (a.id === appId ? ' on' : '') + '" data-app="' + a.id + '">' + ico(a) +
+    '<span style="min-width:0"><span class="t">' + esc(a.label) + ' <span class="v">' + esc(a.versionName || a.versionCode) + '</span></span><span class="p" style="display:block">' + esc(a.pkg) + '</span>' +
+    '<span class="chips" style="margin-top:4px">' + (a.builtin ? '<span class="kp">Included</span>' : '') + (a.kind ? '<span class="kp ' + a.kind + '">' + esc(KINDS[a.kind]) + '</span>' : '') + '<span class="kp">' + mb(a.size) + '</span></span></span></button>').join('');
+}
+$('#apps').onclick = e => {
+  const b = e.target.closest('[data-app]'); if (!b) return;
+  appId = b.dataset.app; ls.set('br.deploy.app', appId);
+  const a = app();
+  if (a && a.kind && D.boards.some(x => x.kind === a.kind)) setFilter(a.kind); else renderAll();
+};
+function upload(files) {
+  const list = Array.from(files || []).filter(f => /\.apk$/i.test(f.name));
+  if (!list.length) { toast('Drop an .apk file.', true); return; }
+  const next = () => {
+    const f = list.shift(); if (!f) { $('#dropText').textContent = 'Drop an APK here or click to choose'; $('#dropBar').hidden = true; return; }
+    $('#dropText').textContent = 'Adding ' + f.name + '…'; $('#dropBar').hidden = false; $('#dropBar i').style.width = '0%';
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/deploy/apps');
+    x.setRequestHeader('X-Board-Remote', '1');
+    x.setRequestHeader('X-File-Name', encodeURIComponent(f.name));
+    x.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
+    x.upload.onprogress = ev => { if (ev.lengthComputable) $('#dropBar i').style.width = Math.round(ev.loaded / ev.total * 100) + '%'; };
+    x.onload = () => { let j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, message: 'Upload failed.' }; } report(j); if (j.ok && j.app) { appId = j.app.id; ls.set('br.deploy.app', appId); if (j.app.kind) fKind = j.app.kind; selReady = false; sel.clear(); } poll().then(next); };
+    x.onerror = () => { toast('Upload failed. Is Board Remote running?', true); next(); };
+    x.send(f);
+  };
+  next();
+}
+$('#file').onchange = e => { upload(e.target.files); e.target.value = ''; };
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('on'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('on'); }));
+drop.addEventListener('drop', e => upload(e.dataTransfer.files));
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { if (!e.target.closest('#drop') && !e.target.closest('#impText')) { e.preventDefault(); if (mode === 'push' && e.dataTransfer.files.length) upload(e.dataTransfer.files); } });
+
+/* ---------- left: MediaCare link ---------- */
+function renderMc() {
+  const m = D.mc, dv = D.discovered;
+  const sig = JSON.stringify([m, dv && dv.mapping, dv && dv.collections && dv.collections.length, Object.keys(mcFields), mcEdit]);
+  const card = $('#mcCard');
+  if (sig === mcSig && card.innerHTML) return;
+  if (card.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  mcSig = sig;
+  const linked = !!m.url;
+  const fieldsFor = (idx, col) => mcFields[idx + '/' + col] || (dv && dv.mapping && dv.mapping.index === idx && dv.mapping.collection === col ? dv.fields : null) || [];
+  const opt = (v, label, cur) => '<option value="' + esc(v) + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + esc(label) + '</option>';
+  const fieldSel = (id, list, cur, blank) => '<select class="sel mono" id="' + id + '">' + (blank ? opt('', blank, cur) : '') + (cur && list.indexOf(cur) < 0 ? opt(cur, cur, cur) : '') + list.map(f => opt(f, f, cur)).join('') + '</select>';
+  const cols = (dv && dv.collections) || (m.collection ? [{ index: m.index, name: m.collection, kind: 'devices' }] : []);
+  const colOpts = (cur, want) => cols.map(c => '<option value="' + esc(c.index + '/' + c.name) + '"' + (c.index + '/' + c.name === cur ? ' selected' : '') + (c.kind === 'private' ? ' disabled' : '') + '>' + esc(c.index + ' / ' + c.name) + (c.kind === 'private' ? ' (private, not read)' : c.kind === want ? '  ✓' : '') + '</option>').join('');
+  const w0 = (m.writes || [])[0] || { path: '', mode: 'text', format: '{room}' };
+  const w1 = (m.writes || []).find((w, i) => i > 0 && w.mode === 'text') || (w0.mode === 'link' ? { path: '', mode: 'text', format: '{room}' } : null);
+  const devFields = fieldsFor(m.index, m.collection);
+  const roomFields = m.roomsCollection ? fieldsFor(m.index, m.roomsCollection) : [];
+  let h = '<div class="hrow"><h2>MediaCare link</h2>' + (m.linkedAt ? '<span class="label">Linked</span>' : '') + '</div>';
+  h += '<div class="status ' + (m.ready ? 'ok' : linked ? 'warn' : '') + '"><span class="d"></span>' + (m.ready ? 'Ready: ' + esc(m.index + '/' + m.collection) + ', matched by ' + esc(srcText(m, m.idSource)) : linked ? 'Connected. Find the device records next.' : 'Not linked yet') + '</div>';
+  const fold = m.ready && !mcEdit;
+  if (fold) h += '<div class="hrow" style="font-size:12.5px"><span class="mono" style="min-width:0;overflow:hidden;text-overflow:ellipsis">' + esc(m.url) + (m.user ? ' · ' + esc(m.user) : '') + '</span><button class="link" id="mcEditBtn">Change</button></div>' +
+    '<button class="btn sm" id="mcFind">Find device records again</button>';
+  else h += '<div class="form">' +
+    '<label class="f"><span>MediaCare (Kuzzle) address</span><input class="in mono" id="mcUrl" placeholder="http://10.20.0.5:7512" value="' + esc(m.url) + '"></label>' +
+    '<div class="two"><label class="f"><span>Login</span><input class="in" id="mcUser" autocomplete="off" value="' + esc(m.user) + '"></label>' +
+    '<label class="f"><span>Password</span><input class="in" id="mcPass" type="password" autocomplete="new-password" placeholder="' + (m.hasPass ? '•••••• saved' : '') + '"></label></div>' +
+    '<label class="f"><span>Kong API key (only if needed)</span><input class="in mono" id="mcKey" autocomplete="off" placeholder="' + (m.hasKey ? '•••••• saved' : 'none') + '"></label>' +
+    '<label class="chk"><input type="checkbox" id="mcInsecure"' + (m.insecure ? ' checked' : '') + '><span>Trust its certificate<small>For an https address with its own certificate</small></span></label>' +
+    '<div class="two"><button class="btn sm" id="mcSave">Save and connect</button><button class="btn sm dark" id="mcFind"' + (linked ? '' : ' disabled') + '>Find device records</button></div></div>';
+  if (m.collection || (dv && dv.collections)) {
+    h += '<hr class="sep"><div class="map">' +
+      '<label class="f"><span>Device records</span><select class="sel" id="mcCol">' + (m.collection ? '' : '<option value="">Pick the devices collection</option>') + colOpts(m.index + '/' + m.collection, 'devices') + '</select></label>' +
+      '<div class="f"><span>Match each board by</span><div class="eq">' + fieldSel('mcIdPath', devFields, m.idPath, 'field') + '<b>=</b><select class="sel" id="mcIdSrc">' + Object.keys(m.sources).map(k => opt(k, m.sources[k], m.idSource)).join('') + '</select></div></div>' +
+      '<div class="f"><span>Room field</span>' + fieldSel('mcRoomPath', devFields, w0.path, 'field') + '</div>' +
+      '<label class="f"><span>Write the room as</span><select class="sel" id="mcMode">' + opt('text', 'The room number, as text', w0.mode) + opt('link', 'A link to a room record', w0.mode) + '</select></label>' +
+      (w0.mode === 'link'
+        ? '<div class="two"><label class="f"><span>Room records</span><select class="sel" id="mcRoomsCol">' + opt('', 'Pick', m.index + '/' + m.roomsCollection) + colOpts(m.index + '/' + m.roomsCollection, 'rooms') + '</select></label>' +
+          '<label class="f"><span>Room number field</span>' + fieldSel('mcRoomsPath', roomFields, m.roomsPath, 'field') + '</label></div>' +
+          '<div class="f"><span>Also write the number to (optional)</span><div class="two">' + fieldSel('mcAlsoPath', devFields, w1 ? w1.path : '', 'nothing else') + '<input class="in mono" id="mcAlsoFmt" value="' + esc(w1 ? w1.format || '{room}' : '{room}') + '"></div></div>'
+        : '<label class="f"><span>Format</span><input class="in mono" id="mcFmt" value="' + esc(w0.format || '{room}') + '"></label>') +
+      '<div class="muted" style="font-size:11.5px">{room} is the room from your list, {unit} its unit.</div>' +
+      '<button class="btn sm dark" id="mcMapSave">Save fields</button></div>';
+  }
+  h += '<div class="muted" style="font-size:11.5px;line-height:1.45">Board Remote only reads device and room records. Collections that look like patient or staff data are never opened. The login is kept in boards.json on this PC.</div>';
+  card.innerHTML = h;
+  const eb = $('#mcEditBtn'); if (eb) eb.onclick = () => { mcEdit = true; mcSig = ''; renderMc(); };
+  if ($('#mcSave')) $('#mcSave').onclick = async () => {
+    const body = { url: $('#mcUrl').value.trim(), user: $('#mcUser').value.trim(), insecure: $('#mcInsecure').checked };
+    if ($('#mcPass').value) body.pass = $('#mcPass').value;
+    if ($('#mcKey').value) body.apiKey = $('#mcKey').value;
+    $('#mcSave').disabled = true;
+    const j = report(await api('/api/deploy/mc/settings', body));
+    if (j.ok) mcEdit = false;
+    mcSig = ''; await poll();
+  };
+  $('#mcFind').onclick = async () => {
+    $('#mcFind').disabled = true; $('#mcFind').textContent = 'Looking…';
+    const j = report(await api('/api/deploy/mc/discover', {}));
+    mcSig = ''; mcFields = {}; await poll();
+    if (j.ok) preview(true);
+  };
+  const col = $('#mcCol');
+  if (col) {
+    col.onchange = async () => { const [i, c] = col.value.split('/'); await loadFields(i, c); };
+    $('#mcMode').onchange = () => { const mm = JSON.parse(JSON.stringify(D.mc)); mm.writes = [{ path: $('#mcRoomPath').value, mode: $('#mcMode').value, format: '{room}' }]; D.mc = Object.assign(D.mc, mm); mcSig = ''; renderMc(); };
+    const rc = $('#mcRoomsCol');
+    if (rc) rc.onchange = async () => { const [i, c] = rc.value.split('/'); D.mc.roomsCollection = c || ''; if (c) await loadFields(i, c); mcSig = ''; renderMc(); };
+    $('#mcMapSave').onclick = saveMapping;
+  }
+}
+async function loadFields(index, collection) {
+  if (!collection) return;
+  const j = await api('/api/deploy/mc/fields', { index, collection });
+  if (!j.ok) { report(j); return; }
+  mcFields[index + '/' + collection] = j.fields;
+  if (collection !== D.mc.roomsCollection) { D.mc.index = index; D.mc.collection = collection; }
+  mcSig = ''; renderMc();
+}
+async function saveMapping() {
+  const [index, collection] = ($('#mcCol').value || '/').split('/');
+  const modeV = $('#mcMode').value;
+  const writes = [{ path: $('#mcRoomPath').value, mode: modeV, format: modeV === 'text' ? ($('#mcFmt').value || '{room}') : '' }];
+  if (modeV === 'link' && $('#mcAlsoPath').value) writes.push({ path: $('#mcAlsoPath').value, mode: 'text', format: $('#mcAlsoFmt').value || '{room}' });
+  const old = D.mc.writes || [];
+  writes.forEach(w => { const o = old.find(x => x.path === w.path && x.mode === w.mode); if (o && o.asNumber && w.format === o.format) w.asNumber = true; });
+  const body = { index, collection, idPath: $('#mcIdPath').value, idSource: $('#mcIdSrc').value, writes, roomsCollection: modeV === 'link' ? ($('#mcRoomsCol').value || '/').split('/')[1] : '', roomsPath: modeV === 'link' ? $('#mcRoomsPath').value : '' };
+  const j = report(await api('/api/deploy/mc/mapping', body));
+  mcSig = ''; await poll();
+  if (j.ok) preview(true);
+}
+
+/* ---------- table ---------- */
+$('#modeSeg').onclick = e => { const b = e.target.closest('[data-mode]'); if (!b) return; mode = b.dataset.mode; ls.set('br.deploy.mode', mode); renderAll(); if (mode === 'rooms' && D.mc.ready && !D.preview) preview(true); };
+function renderFilters() {
+  const kinds = {}; D.boards.forEach(b => { kinds[b.kind] = (kinds[b.kind] || 0) + 1; });
+  const units = Array.from(new Set(D.boards.map(b => b.unit).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const el = $('#filters');
+  if (el.contains(document.activeElement) && document.activeElement.id === 'fq') {
+    el.querySelectorAll('.fchip').forEach(c => c.classList.toggle('on', c.dataset.k === fKind));
+    return;
+  }
+  el.innerHTML = '<button class="fchip' + (fKind === 'all' ? ' on' : '') + '" data-k="all">All <b>' + D.boards.length + '</b></button>' +
+    KIND_ORDER.filter(k => kinds[k]).map(k => '<button class="fchip' + (fKind === k ? ' on' : '') + '" data-k="' + k + '">' + KPLURAL[k] + ' <b>' + kinds[k] + '</b></button>').join('') +
+    (units.length > 1 ? '<select class="sel" id="fu"><option value="">Every unit</option>' + units.map(u => '<option' + (u === fUnit ? ' selected' : '') + '>' + esc(u) + '</option>').join('') + '</select>' : '') +
+    '<input class="in" id="fq" placeholder="Find a room or IP" value="' + esc(fQ) + '">';
+  el.querySelectorAll('.fchip').forEach(c => c.onclick = () => setFilter(c.dataset.k));
+  const fu = $('#fu'); if (fu) fu.onchange = () => { fUnit = fu.value; sel.clear(); boardsShown().forEach(b => sel.add(b.id)); renderAll(); };
+  $('#fq').oninput = e => { fQ = e.target.value; renderRows(); renderRight(); };
+}
+function verCell(b, a) {
+  if (!a) return '<span class="t-mut">Pick an app</span>';
+  const rec = b.inst[a.pkg];
+  if (!rec) return '<span class="t-mut">' + (b.status === 'online' ? 'Not checked' : 'Offline') + '</span>';
+  if (rec.none) return '<span class="tag">Not installed</span>';
+  const v = esc(rec.vn || rec.vc);
+  if (rec.vc === a.versionCode) return '<span class="tag ok">' + v + ' current</span>';
+  if (rec.vc < a.versionCode) return '<span class="tag warn">' + v + ' older</span>';
+  return '<span class="tag info">' + v + ' newer</span>';
+}
+function jobCell(r, job) {
+  if (!r) return '';
+  if (r.st === 'wait') return '<span class="t-mut">Waiting</span>';
+  if (r.st === 'run') return '<span class="spin"></span><span class="msg t-info">' + esc(r.step || 'Working') + ' · ' + secs(Date.now() - r.t0) + '</span>';
+  if (r.st === 'ok') return '<span class="msg t-ok">✓ ' + esc(r.msg) + '</span>';
+  if (r.st === 'skip') return '<span class="msg t-mut">' + esc(r.msg) + '</span>';
+  const SHORT = { sig: 'Signed with a different key', down: 'Board has a newer version', space: 'Board storage is full', sdk: 'Android too old for this app', abi: 'Built for another processor', auth: 'Waiting for Allow on the board', offline: 'Not reachable', blocked: 'Board blocked the install', bad: 'Board could not read the APK' };
+  return '<span class="msg t-bad" title="' + esc(r.msg) + '">' + esc(SHORT[r.code] || r.msg) + '</span>' +
+    (job.type === 'push' && r.code === 'sig' && !job.running ? '<button class="btn sm danger" data-reinstall="' + r.id + '" title="Removes the old app and its data, then installs">Remove and install</button>' : '');
+}
+function roomCells(b) {
+  const pv = D.preview && D.preview.rows.find(x => x.id === b.id);
+  const jr = D.jobs.rooms && D.jobs.rooms.rows.find(x => x.id === b.id);
+  let a = '', c = '';
+  if (pv) {
+    a = pv.record ? '<span title="' + esc(pv.ident) + '">' + esc(pv.record) + (pv.now ? '<br><span class="t-mut">room ' + esc(pv.now) + '</span>' : '') + '</span>' : '<span class="t-mut" title="' + esc(pv.ident) + '">' + esc(pv.ident || 'No identity yet') + '</span>';
+    if (pv.st === 'change') c = '<span class="msg t-info"><b>' + esc(pv.now) + '</b><span class="arrow">→</span><b>' + esc(pv.next) + '</b>' + (pv.warn ? '<br><span class="t-warn" style="font-weight:600">' + esc(pv.warn) + '</span>' : '') + '</span>';
+    else if (pv.st === 'same') c = '<span class="msg t-ok">✓ ' + esc(pv.msg) + '</span>';
+    else if (pv.st === 'pick') c = '<select class="sel" data-pick="' + b.id + '"><option value="">' + esc(pv.msg) + '</option>' + pv.options.map(o => '<option value="' + esc(o.id) + '"' + (picks[b.id] === o.id ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>';
+    else c = '<span class="msg t-warn" title="' + esc(pv.msg) + '">' + esc(pv.msg) + '</span>';
+  } else {
+    const id = b.ident || {};
+    const key = D.mc.idSource && D.mc.idSource !== 'ip' ? id[D.mc.idSource] : '';
+    a = '<span class="t-mut mono" style="font-size:11px">' + esc(key || id.ethMac || id.wifiMac || '') + '</span>';
+    c = D.mc.ready ? '<span class="t-mut">Preview to see the change</span>' : '<span class="t-mut">Link MediaCare first</span>';
+  }
+  if (jr && (jr.st !== 'wait' || D.jobs.rooms.running)) c = jobCell(jr, D.jobs.rooms);
+  return [a, c];
+}
+function renderRows() {
+  const list = boardsShown(), a = app(), job = D.jobs.push;
+  const rs = (a && a.pkg === ROOMSIGN_PKG) ? D.jobs.setrooms : null;
+  const el = $('#rows');
+  if (!D.boards.length) {
+    el.innerHTML = '<div class="nobody"><h3>No boards yet</h3><div>Import your room list and the Boards page builds itself.</div><button class="btn dark" id="nbImport">Import room list</button></div>';
+    $('#nbImport').onclick = openImport; renderFoot(list); return;
+  }
+  const allOn = list.length && list.every(b => sel.has(b.id));
+  const head = '<div class="tr th"><label class="ck"><input type="checkbox" id="ckAll"' + (allOn ? ' checked' : '') + '></label><span>Room</span><span>Device</span><span class="ipc">IP</span><span></span>' +
+    (mode === 'push' ? '<span>On the board</span><span>' + (rs ? 'Room sign' : 'Push') + '</span>' : '<span>MediaCare now</span><span>Change</span>') + '</div>';
+  const body = list.map(b => {
+    const jr = job && job.appId === (a && a.id) ? job.rows.find(x => x.id === b.id) : job && job.rows.find(x => x.id === b.id && x.st !== 'wait');
+    let second = jobCell(jr, job || {});
+    if (rs) { const rr = rs.rows.find(x => x.id === b.id); if (rr && (rr.st !== 'wait' || rs.running)) second = jobCell(rr, rs); }
+    const cells = mode === 'push' ? [verCell(b, a), second] : roomCells(b);
+    return '<div class="tr' + (b.status === 'online' ? '' : ' off') + '" data-id="' + b.id + '">' +
+      '<label class="ck"><input type="checkbox" data-ck="' + b.id + '"' + (sel.has(b.id) ? ' checked' : '') + '></label>' +
+      '<div class="rm"><b>' + esc(b.room || '·') + '</b><span>' + esc(b.unit || '') + '</span></div>' +
+      '<div class="nm"><span class="t">' + esc(b.name) + '</span><span class="s"><span class="kp ' + b.kind + '">' + esc(KINDS[b.kind]) + '</span><span class="m">' + esc(b.model || '') + (b.android ? ' · Android ' + esc(b.android) : '') + '</span></span></div>' +
+      '<span class="ipc">' + esc(b.host) + (b.port !== 5555 ? ':' + b.port : '') + '</span>' +
+      '<span class="sd ' + statusCls(b.status) + '" title="' + esc(STATUS_TXT[b.status] || b.status) + '"></span>' +
+      '<div class="ca">' + cells[0] + '</div><div class="cb">' + cells[1] + '</div></div>';
+  }).join('');
+  const st = el.scrollTop;
+  el.innerHTML = head + (body || '<div class="nobody">No boards match this filter.</div>');
+  el.scrollTop = st;
+  renderFoot(list);
+}
+function renderFoot(list) {
+  const s = selected();
+  const on = s.filter(b => b.status === 'online').length;
+  $('#tfoot').innerHTML = '<span><b>' + s.length + '</b> selected' + (s.length ? ' · ' + on + ' connected' : '') + '</span><span class="grow"></span>' +
+    (D.checking ? '<span class="spin"></span><span>Checking versions ' + D.checking.done + ' of ' + D.checking.total + '</span>' : '') +
+    '<span>' + plural(list.length, 'board') + ' shown</span>';
+  $('#tbarInfo').textContent = mode === 'push' ? (app() ? app().label + ' ' + (app().versionName || '') : '') : (D.preview ? 'Preview ' + ago(D.preview.at) : '');
+}
+$('#rows').addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'ckAll') { boardsShown().forEach(b => { if (t.checked) sel.add(b.id); else sel.delete(b.id); }); renderRows(); renderRight(); return; }
+  if (t.dataset.ck) { if (t.checked) sel.add(t.dataset.ck); else sel.delete(t.dataset.ck); renderFoot(boardsShown()); renderRight(); const all = $('#ckAll'); if (all) all.checked = boardsShown().every(b => sel.has(b.id)); return; }
+  if (t.dataset.pick) { picks[t.dataset.pick] = t.value; preview(true); }
+});
+$('#rows').addEventListener('click', async e => {
+  const r = e.target.closest('[data-reinstall]'); if (!r) return;
+  const b = D.boards.find(x => x.id === r.dataset.reinstall);
+  if (!confirm('Remove the old app from ' + (b ? b.name : 'this board') + ' and install this one?\n\nThe app\'s data on that board is cleared. Use this when the old app was signed with a different key.')) return;
+  report(await api('/api/deploy/retry', { ids: [r.dataset.reinstall], removeFirst: true, opts }));
+  poll();
+});
+
+/* ---------- right panel ---------- */
+function selKindsText(list) {
+  const k = {}; list.forEach(b => { k[b.kind] = (k[b.kind] || 0) + 1; });
+  const keys = Object.keys(k);
+  if (keys.length === 1) return plural(list.length, KINDS[keys[0]].toLowerCase(), KPLURAL[keys[0]].toLowerCase());
+  return plural(list.length, 'board');
+}
+let rightSig = '';
+function renderRight() {
+  const el = $('#right');
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName) && document.activeElement.type !== 'checkbox') return;
+  const html = mode === 'push' ? pushPanel() : roomsPanel();
+  if (html === rightSig) return;
+  rightSig = html;
+  el.innerHTML = html;
+  wireRight();
+}
+function counts(job) {
+  const c = job.counts;
+  const pct = k => (c[k] / Math.max(1, c.total) * 100) + '%';
+  return '<div class="prog"><i class="g" style="width:' + pct('ok') + '"></i><i class="s" style="width:' + pct('skip') + '"></i><i class="r" style="width:' + pct('fail') + '"></i><i class="b" style="width:' + pct('run') + '"></i></div>' +
+    '<div class="counts">' + (c.ok ? '<span class="chip ok"><b>' + c.ok + '</b> done</span>' : '') + (c.skip ? '<span class="chip"><b>' + c.skip + '</b> skipped</span>' : '') + (c.fail ? '<span class="chip bad"><b>' + c.fail + '</b> failed</span>' : '') +
+    (c.run ? '<span class="chip info"><b>' + c.run + '</b> working</span>' : '') + (c.wait ? '<span class="chip"><b>' + c.wait + '</b> waiting</span>' : '') + '</div>';
+}
+function pushPanel() {
+  const a = app(), s = selected(), job = D.jobs.push;
+  let h = '<div class="card">';
+  if (!a) {
+    h += '<h2>Push an app</h2><div class="note">Add an APK to the library on the left, pick it, then pick the boards. Board Remote installs it on all of them at once and checks each one.</div></div>';
+    return h + histCard();
+  }
+  h += '<div class="apphead">' + ico(a).replace('class="ico', 'class="ico') + '<div style="min-width:0"><div class="t">' + esc(a.label) + ' ' + esc(a.versionName || a.versionCode) + '</div><div class="p">' + esc(a.pkg) + ' · build ' + esc(a.versionCode) + '</div></div></div>' +
+    '<dl class="kv"><dt>Needs</dt><dd>' + esc(a.minAndroid || 'any Android') + ' or newer</dd><dt>Opens</dt><dd title="' + esc(a.launcher || a.home) + '">' + esc((a.launcher || a.home || 'no launch screen').split('.').pop()) + (a.home ? ' · home screen app' : '') + '</dd>' +
+    (a.abis.length ? '<dt>Built for</dt><dd>' + esc(a.abis.join(', ')) + '</dd>' : '') + '<dt>Size</dt><dd>' + mb(a.size) + (a.signed ? '' : ' · <span class="t-bad">not signed</span>') + '</dd>' +
+    '<dt>For</dt><dd><select class="sel" id="appKind" style="height:28px;font-size:12px;border-width:1px;width:auto">' + ['', 'wb', 'ds', 'tv', 'cam', 'tab', 'usb'].map(k => '<option value="' + k + '"' + (a.kind === k ? ' selected' : '') + '>' + (k ? KPLURAL[k] : 'Any board') + '</option>').join('') + '</select>' + (a.builtin ? '' : ' <button class="link" id="appRemove" style="margin-left:6px">Remove</button>') + '</dd></dl>' +
+    (a.builtin ? '<div class="note">Comes with Board Remote. Keeps network ADB on through reboots, so push it to every board once.</div>' : '');
+  const instd = s.map(b => b.inst[a.pkg]).filter(Boolean);
+  const cur = instd.filter(r => !r.none && r.vc === a.versionCode).length, old = instd.filter(r => !r.none && r.vc < a.versionCode).length, none = instd.filter(r => r.none).length, newer = instd.filter(r => !r.none && r.vc > a.versionCode).length;
+  h += '<hr class="sep"><div class="hrow"><div><div class="label">Targets</div><div style="font-weight:800;font-size:15px">' + (s.length ? selKindsText(s) + ' selected' : 'Nothing selected') + '</div></div><button class="btn sm" id="chkVer"' + (s.length && !D.checking ? '' : ' disabled') + '>Check versions</button></div>' +
+    (instd.length ? '<div class="counts">' + (cur ? '<span class="chip ok"><b>' + cur + '</b> current</span>' : '') + (old ? '<span class="chip warn"><b>' + old + '</b> older</span>' : '') + (none ? '<span class="chip"><b>' + none + '</b> not installed</span>' : '') + (newer ? '<span class="chip info"><b>' + newer + '</b> newer</span>' : '') + (s.length - instd.length ? '<span class="chip"><b>' + (s.length - instd.length) + '</b> not checked</span>' : '') + '</div>' : '');
+  const running = job && job.running;
+  h += running
+    ? '<button class="btn wide" id="stopPush">Stop after the boards in progress</button>'
+    : '<button class="btn dark wide" id="doPush"' + (s.length ? '' : ' disabled') + '>Push ' + esc(a.versionName || a.versionCode) + ' to ' + (s.length ? selKindsText(s) : 'the selected boards') + '</button>';
+  h += '<div class="label" style="margin-top:2px">Options</div><div class="form">' +
+    chk('skipSame', 'Skip boards already on this version', '') +
+    (a.builtin ? '' : chk('launch', 'Open the app when it is installed', 'Then check it is running')) +
+    chk('grant', 'Grant its permissions', 'Android 6 and newer') +
+    (a.builtin ? '' : chk('watch', 'Watch this app in Device health', '')) +
+    chk('downgrade', 'Allow an older version to replace a newer one', '') +
+    '<label class="f"><span>Boards at a time</span><select class="sel" id="optPar">' + [2, 4, 6, 8, 12, 16].map(n => '<option' + (n === opts.parallel ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></label></div>';
+  h += '</div>';
+  if (job) {
+    const c = job.counts;
+    h += '<div class="card"><div class="hrow"><h2>' + (job.running ? 'Pushing ' : 'Last push: ') + esc(job.title) + '</h2></div>' + counts(job) +
+      '<div class="muted" style="font-size:12px">' + (job.running ? 'Running for ' + secs(Date.now() - job.startedAt) : 'Finished ' + ago(job.endedAt) + ' in ' + secs(job.endedAt - job.startedAt)) + (job.stop && job.running ? ' · stopping' : '') + '</div>' +
+      (!job.running && c.fail ? '<button class="btn sm" id="retry">Retry ' + plural(c.fail, 'failed board') + '</button>' : '') + '</div>';
+  }
+  if (a.pkg === ROOMSIGN_PKG) h += roomSignCard(s);
+  return h + histCard();
+}
+function roomSignCard(s) {
+  const rs = D.jobs.setrooms;
+  const withRoom = s.filter(b => String(b.room || '').trim()).length;
+  const noRoom = s.length - withRoom;
+  let h = '<div class="card"><h2>Set the room on each sign</h2>' +
+    '<div class="note">Each sign shows the room from its line on the Boards page. Pick the signs on the left, then set them all at once. Push the app to a sign first if it is not installed yet.</div>' +
+    '<hr class="sep"><div class="hrow"><div><div class="label">From the Boards page</div><div style="font-weight:800;font-size:15px">' + (s.length ? withRoom + ' of ' + s.length + ' have a room' : 'Nothing selected') + '</div></div></div>';
+  if (noRoom) h += '<div class="note warn">' + plural(noRoom, 'selected board') + ' ' + (noRoom === 1 ? 'has' : 'have') + ' no room on the Boards page. Set it there, then it is included here.</div>';
+  if (rs && rs.running) h += '<button class="btn wide" id="stopSetRooms">Stop after the signs in progress</button>';
+  else h += '<button class="btn dark wide" id="doSetRooms"' + (withRoom ? '' : ' disabled') + '>Set the room on ' + (withRoom ? plural(withRoom, 'sign') : 'the signs') + '</button>';
+  if (rs) {
+    const c = rs.counts;
+    h += counts(rs) + '<div class="muted" style="font-size:12px">' + (rs.running ? 'Running for ' + secs(Date.now() - rs.startedAt) : 'Finished ' + ago(rs.endedAt) + ' in ' + secs(rs.endedAt - rs.startedAt)) + (rs.stop && rs.running ? ' · stopping' : '') + '</div>' +
+      (!rs.running && c.fail ? '<button class="btn sm" id="retryRooms">Retry ' + plural(c.fail, 'failed sign') + '</button>' : '');
+  }
+  return h + '</div>';
+}
+function chk(k, label, small) { return '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (opts[k] ? ' checked' : '') + '><span>' + esc(label) + (small ? '<small>' + esc(small) + '</small>' : '') + '</span></label>'; }
+function histCard() {
+  const hs = D.history.filter(x => x.type === (mode === 'push' ? 'push' : 'rooms')).slice(0, 5);
+  if (!hs.length) return '';
+  return '<div class="card"><div class="label">Recent</div><div class="hist">' + hs.map(x => '<div class="h"><span><b>' + esc(x.title) + '</b><br><span class="muted">' + (x.ok ? x.ok + ' done' : '') + (x.skip ? ' · ' + x.skip + ' skipped' : '') + (x.fail ? ' · <span class="t-bad">' + x.fail + ' failed</span>' : '') + (x.stopped ? ' · stopped' : '') + '</span></span><span class="muted">' + ago(x.at) + '</span></div>').join('') + '</div></div>';
+}
+function roomsPanel() {
+  const s = selected(), pv = D.preview, job = D.jobs.rooms, m = D.mc;
+  let h = '<div class="card"><h2>Rooms in MediaCare</h2>';
+  if (!m.ready) {
+    h += '<div class="note">Each device gets its room from MediaCare. Link MediaCare on the left: Board Remote finds the device records and the room field for you, then writes the room from your list into each device\'s record.</div>' +
+      '<div class="steps">' + step(1, !!m.url, !m.url, 'Connect to MediaCare', 'Address and a login that can change device records.') + step(2, !!m.collection, !!m.url && !m.collection, 'Find the device records', 'Matched by each board\'s MAC, serial or IP.') + step(3, false, false, 'Preview, test on one, then apply', 'Every old value is kept so you can undo.') + '</div></div>';
+    return h;
+  }
+  const rows = pv ? pv.rows.filter(r => sel.has(r.id)) : [];
+  const n = k => rows.filter(r => r.st === k).length;
+  const look = rows.length - n('change') - n('same');
+  const testDone = testedJob && job && job.id === testedJob && !job.running && job.counts.ok === 1;
+  const changeRows = rows.filter(r => r.st === 'change');
+  h += '<div class="muted" style="font-size:12.5px">For ' + (s.length ? selKindsText(s) : 'no boards') + ' selected. Board Remote reads each board\'s ' + esc(srcText(m, m.idSource)) + ', finds its record and sets the room.</div>' +
+    '<button class="btn wide" id="pvBtn"' + (s.length ? '' : ' disabled') + '>' + (pv ? 'Preview again' : 'Preview the changes') + '</button>';
+  if (pv) {
+    h += '<div class="counts">' + (n('change') ? '<span class="chip info"><b>' + n('change') + '</b> to change</span>' : '') + (n('same') ? '<span class="chip ok"><b>' + n('same') + '</b> already right</span>' : '') + (look ? '<span class="chip warn"><b>' + look + '</b> need a look</span>' : '') + '</div>';
+    h += '<label class="chk"><input type="checkbox" id="optRestart"' + (restart ? ' checked' : '') + '><span>Restart the app on each board after<small>So it loads its new room right away</small></span></label>';
+    if (job && job.running) h += '<button class="btn wide" id="stopRooms">Stop</button>';
+    else if (!testDone) h += '<button class="btn dark wide" id="testOne"' + (changeRows.length ? '' : ' disabled') + '>' + (changeRows.length ? 'Test on one: ' + esc((D.boards.find(b => b.id === changeRows[0].id) || {}).name || '') : 'Nothing to change') + '</button>';
+    else h += '<div class="note ok">Test passed on ' + esc((D.boards.find(b => b.id === job.rows[0].id) || {}).name || 'one board') + '. Check its screen, then apply the rest.</div>' +
+      '<button class="btn dark wide" id="applyRest"' + (changeRows.length ? '' : ' disabled') + '>' + (changeRows.length ? 'Apply to the other ' + plural(changeRows.length, 'device') : 'Nothing left to change') + '</button>';
+  }
+  h += '</div>';
+  if (job) h += '<div class="card"><h2>' + esc(job.title) + '</h2>' + counts(job) + '<div class="muted" style="font-size:12px">' + (job.running ? 'Running' : 'Finished ' + ago(job.endedAt)) + '</div></div>';
+  if (D.undo) h += '<div class="card"><div class="hrow"><div><div class="label">Undo</div><div style="font-weight:700;font-size:13px">Last change: ' + plural(D.undo.count, 'device') + ', ' + ago(D.undo.at) + '</div></div><button class="btn sm danger" id="undo">Undo</button></div></div>';
+  return h + histCard();
+}
+function step(n, done, cur, title, x) { return '<div class="stp' + (done ? ' done' : cur ? ' cur' : '') + '"><span class="n">' + (done ? '✓' : n) + '</span><span class="b"><b>' + esc(title) + '</b><span class="x">' + esc(x) + '</span></span></div>'; }
+function wireRight() {
+  document.querySelectorAll('#right [data-opt]').forEach(i => i.onchange = () => { opts[i.dataset.opt] = i.checked; ls.set('br.deploy.opts', JSON.stringify(opts)); });
+  const par = $('#optPar'); if (par) par.onchange = () => { opts.parallel = Number(par.value); ls.set('br.deploy.opts', JSON.stringify(opts)); };
+  const ak = $('#appKind'); if (ak) ak.onchange = async () => { report(await api('/api/deploy/apps/' + appId + '/edit', { kind: ak.value })); await poll(); if (ak.value) setFilter(ak.value); };
+  const ar = $('#appRemove'); if (ar) ar.onclick = async () => { const a = app(); if (!a || !confirm('Remove ' + a.label + ' ' + a.versionName + ' from the library? Boards keep whatever is installed.')) return; report(await api('/api/deploy/apps/' + a.id + '/remove', {})); appId = ''; poll(); };
+  const cv = $('#chkVer'); if (cv) cv.onclick = async () => { report(await api('/api/deploy/versions', { appId, ids: selected().map(b => b.id) })); poll(); };
+  const dp = $('#doPush'); if (dp) dp.onclick = async () => {
+    const a = app(), s = selected();
+    const off = s.filter(b => b.status !== 'online').length;
+    if (!confirm('Push ' + a.label + ' ' + a.versionName + ' to ' + selKindsText(s) + '?' + (off ? '\n\n' + off + ' of them are not connected right now. Board Remote tries to reach them and reports any it cannot.' : ''))) return;
+    report(await api('/api/deploy/push', { appId, ids: s.map(b => b.id), opts }));
+    poll();
+  };
+  const sp = $('#stopPush'); if (sp) sp.onclick = async () => { report(await api('/api/deploy/stop', { type: 'push' })); poll(); };
+  const rt = $('#retry'); if (rt) rt.onclick = async () => { report(await api('/api/deploy/retry', { opts })); poll(); };
+  const dsr = $('#doSetRooms'); if (dsr) dsr.onclick = async () => {
+    const s = selected().filter(b => String(b.room || '').trim());
+    if (!s.length) return;
+    const off = s.filter(b => b.status !== 'online').length;
+    if (!confirm('Set the room on ' + plural(s.length, 'sign') + ' from the Boards page?' + (off ? '\n\n' + off + ' of them are not connected right now. Board Remote tries to reach them and reports any it cannot.' : ''))) return;
+    report(await api('/api/deploy/setrooms', { ids: s.map(b => b.id), opts: { parallel: opts.parallel } }));
+    poll();
+  };
+  const ssr = $('#stopSetRooms'); if (ssr) ssr.onclick = async () => { report(await api('/api/deploy/stop', { type: 'setrooms' })); poll(); };
+  const rtr = $('#retryRooms'); if (rtr) rtr.onclick = async () => { report(await api('/api/deploy/retry', { type: 'setrooms', opts: { parallel: opts.parallel } })); poll(); };
+  const pb = $('#pvBtn'); if (pb) pb.onclick = () => preview(false);
+  const rs = $('#optRestart'); if (rs) rs.onchange = () => { restart = rs.checked; };
+  const t1 = $('#testOne'); if (t1) t1.onclick = async () => {
+    const row = D.preview.rows.find(r => sel.has(r.id) && r.st === 'change'); if (!row) return;
+    const b = D.boards.find(x => x.id === row.id);
+    if (!confirm('Write room ' + row.next + ' to ' + b.name + '\'s record in MediaCare' + (restart ? ' and restart its app' : '') + '?')) return;
+    const j = report(await api('/api/deploy/mc/apply', { ids: [row.id], restart }));
+    if (j.ok) { await poll(); testedJob = D.jobs.rooms ? D.jobs.rooms.id : ''; }
+  };
+  const ap = $('#applyRest'); if (ap) ap.onclick = async () => {
+    const ids = D.preview.rows.filter(r => sel.has(r.id) && r.st === 'change').map(r => r.id);
+    if (!confirm('Write rooms to ' + plural(ids.length, 'device') + ' in MediaCare' + (restart ? ' and restart their apps' : '') + '?')) return;
+    report(await api('/api/deploy/mc/apply', { ids, restart })); testedJob = ''; poll();
+  };
+  const sr = $('#stopRooms'); if (sr) sr.onclick = async () => { report(await api('/api/deploy/stop', { type: 'rooms' })); poll(); };
+  const un = $('#undo'); if (un) un.onclick = async () => {
+    if (!confirm('Put back the old room on ' + plural(D.undo.count, 'device') + ' in MediaCare?')) return;
+    report(await api('/api/deploy/mc/undo', { batch: D.undo.batch })); testedJob = ''; poll();
+  };
+}
+let previewing = false;
+async function preview(quiet) {
+  if (previewing || !D || !D.mc.ready) return;
+  const ids = selected().map(b => b.id);
+  if (!ids.length) return;
+  previewing = true;
+  const pb = $('#pvBtn'); if (pb) { pb.disabled = true; pb.textContent = 'Reading MediaCare…'; }
+  const j = await api('/api/deploy/mc/preview', { ids, picks });
+  previewing = false;
+  if (!quiet || !j.ok) report(j);
+  rightSig = ''; poll();
+}
+try { Object.assign(opts, JSON.parse(ls.get('br.deploy.opts', '{}'))); } catch (e) { /* defaults */ }
+
+/* ---------- import dialog ---------- */
+const dlg = $('#dlgImport');
+let impTimer = null, impPlan = null;
+function openImport() { dlg.showModal(); $('#impText').focus(); if (location.hash !== '#import') history.replaceState(null, '', '#import'); impPreview(); }
+$('#btnImport').onclick = openImport;
+$('#impCancel').onclick = () => dlg.close();
+dlg.addEventListener('close', () => { if (location.hash === '#import') history.replaceState(null, '', location.pathname); });
+['input', 'change'].forEach(t => { $('#impText').addEventListener(t, schedImp); $('#impKind').addEventListener(t, schedImp); $('#impUnit').addEventListener(t, schedImp); $('#impRename').addEventListener(t, schedImp); });
+function schedImp() { clearTimeout(impTimer); impTimer = setTimeout(impPreview, 250); }
+const ta = $('#impText');
+['dragenter', 'dragover'].forEach(t => ta.addEventListener(t, e => { e.preventDefault(); ta.classList.add('on'); }));
+['dragleave', 'drop'].forEach(t => ta.addEventListener(t, e => { e.preventDefault(); ta.classList.remove('on'); }));
+ta.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    if (/\.xlsx?$/i.test(f.name)) { toast('Save the sheet as CSV, or copy the cells and paste them here.', true); return; }
+    const r = new FileReader(); r.onload = () => { ta.value = String(r.result); impPreview(); }; r.readAsText(f);
+  } else { const t = e.dataTransfer.getData('text'); if (t) { ta.value = t; impPreview(); } }
+});
+$('#impTemplate').onclick = e => {
+  e.preventDefault();
+  const csv = 'Room,Whiteboard IP,Door sign IP,Unit,Closet\r\n401,10.20.4.11,10.20.4.111,4 West,IDF 4A\r\n402,10.20.4.12,10.20.4.112,4 West,IDF 4A\r\n';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'room_list_template.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+function impBody(apply) { return { text: ta.value, kind: $('#impKind').value, unit: $('#impUnit').value, rename: $('#impRename').checked, apply }; }
+async function impPreview() {
+  if (!ta.value.trim()) {
+    impPlan = null;
+    $('#impSummary').innerHTML = '<span class="label">Preview</span>';
+    $('#impList').innerHTML = '<div class="pv-empty">Paste your list on the left. Any of these work:<br><br><code>Room · Whiteboard IP · Door sign IP · Unit</code> straight from Excel<br><code>Room, Type, IP, Closet</code> as CSV<br><code>401, 10.20.4.11</code> one device per line<br><code>401, 10.20.4.11, 10.20.4.111</code> whiteboard then door sign<br><br>Boards already on the list are matched by IP, or by room and type if their address changed.</div>';
+    $('#impFoot').textContent = 'Nothing pasted yet.'; $('#impApply').disabled = true; return;
+  }
+  const j = await api('/api/deploy/import', impBody(false));
+  if (!j.ok) { $('#impFoot').textContent = j.message || 'Could not read that.'; return; }
+  impPlan = j;
+  const s = j.summary;
+  $('#impSummary').innerHTML = '<span class="chip"><b>' + s.rooms + '</b> ' + (s.rooms === 1 ? 'room' : 'rooms') + '</span>' + (s.new ? '<span class="chip ok"><b>' + s.new + '</b> new</span>' : '') + (s.update ? '<span class="chip info"><b>' + s.update + '</b> updated</span>' : '') + (s.same ? '<span class="chip"><b>' + s.same + '</b> unchanged</span>' : '') + (s.error ? '<span class="chip bad"><b>' + s.error + '</b> skipped</span>' : '') +
+    (j.notes.length ? '<span class="muted" style="font-size:12px;flex-basis:100%">' + esc(j.notes.join(' ')) + '</span>' : '');
+  const WHAT = { new: 'New', update: 'Update', move: 'New address', same: 'No change', error: 'Skipped' };
+  $('#impList').innerHTML = '<div class="pr th"><span>Line</span><span>Room</span><span>Type</span><span>IP</span><span>Unit</span><span>What happens</span></div>' +
+    j.plan.map(p => '<div class="pr"><span class="ln">' + p.line + '</span><span class="r">' + esc(p.room || '·') + '</span><span><span class="kp ' + p.kind + '">' + esc(KINDS[p.kind]) + '</span></span><span class="mono" style="font-size:12px">' + esc(p.host ? p.host + (p.port !== 5555 ? ':' + p.port : '') : '·') + '</span><span class="muted" style="font-size:12px">' + esc([p.unit, p.closet].filter(Boolean).join(' · ')) + '</span>' +
+      '<span class="what ' + p.act + '">' + (p.act === 'error' ? esc(p.err) : WHAT[p.act] + (p.act === 'new' ? ': ' + esc(p.name) : '')) + (p.changes && p.changes.length ? '<small>' + esc(p.changes.join(', ')) + '</small>' : '') + (p.warn ? '<small class="t-warn">' + esc(p.warn) + '</small>' : '') + '</span></div>').join('');
+  const n = s.new + s.update;
+  $('#impFoot').innerHTML = n ? '<b>' + (s.new ? 'Add ' + plural(s.new, 'board') : '') + (s.new && s.update ? ' and update ' + s.update : s.update ? 'Update ' + plural(s.update, 'board') : '') + '</b>' + (s.error ? ' · ' + plural(s.error, 'line') + ' will be skipped' : '') : (s.same ? 'Every board already matches this list.' : 'Nothing usable yet.');
+  $('#impApply').disabled = !n;
+  $('#impApply').textContent = s.new && !s.update ? 'Add ' + plural(s.new, 'board') : n ? 'Apply to Boards' : 'Add to Boards';
+}
+$('#impApply').onclick = async () => {
+  $('#impApply').disabled = true;
+  const j = report(await api('/api/deploy/import', impBody(true)));
+  if (j.ok) { dlg.close(); ta.value = ''; selReady = false; sel.clear(); fKind = 'all'; await poll(); }
+  else $('#impApply').disabled = false;
+};
+
+/* ---------- nav badges, polling ---------- */
+async function healthBadges() {
+  const j = await api('/api/health');
+  if (!j || !j.issues) return;
+  const open = j.issues.filter(i => !i.resolvedAt).length;
+  const nw = (j.found || []).filter(f => f.status === 'found' || f.status === 'claiming').length;
+  $('#navIssues').hidden = !open; $('#navIssues').textContent = open;
+  $('#navNew').hidden = !nw; $('#navNew').textContent = nw;
+}
+async function loop() {
+  await poll();
+  const busy = D && ((D.jobs.push && D.jobs.push.running) || (D.jobs.rooms && D.jobs.rooms.running) || D.checking);
+  setTimeout(loop, busy ? 1200 : 4000);
+}
+loop().then(() => { if (location.hash === '#import') openImport(); });
+healthBadges(); setInterval(healthBadges, 8000);
+})();
+</script>
+<script src="/remote-banner.js"></script>
+</body>
+</html>

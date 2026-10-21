@@ -44,7 +44,7 @@ async function boot() {
   if (!me.ok) return;
   ME = me; roleNames = me.roleNames || {};
   $('#wName').textContent = me.user.name || me.user.email;
-  $('#navHci').hidden = !isHci();
+  $('#navHci').hidden = !isHci(); $('#navUpd').hidden = !isHci();
   const hs = me.hospitals || [];
   const saved = (() => { try { return localStorage.getItem('br.h'); } catch (e) { return null; } })();
   H = (hs.find(h => h.id === saved) || hs[0] || {}).id || null;
@@ -64,7 +64,7 @@ function hospitalChanged() {
 }
 function route() {
   const v = (location.hash || '#boards').slice(1);
-  view = ['boards', 'pcs', 'people', 'log', 'hci'].indexOf(v) >= 0 && (v !== 'hci' || isHci()) ? v : 'boards';
+  view = ['boards', 'pcs', 'people', 'log', 'hci', 'upd'].indexOf(v) >= 0 && ((v !== 'hci' && v !== 'upd') || isHci()) ? v : 'boards';
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === view));
   document.querySelectorAll('.view').forEach(s => { s.hidden = s.id !== 'v-' + view; });
   if (view !== 'boards') closeDrawer();
@@ -72,6 +72,7 @@ function route() {
 }
 function load() {
   if (view === 'hci') return loadHci();
+  if (view === 'upd') return loadUpd();
   if (!H) return;
   if (view === 'boards' || view === 'pcs') return loadFleet();
   if (view === 'people') return loadPeople();
@@ -210,14 +211,36 @@ $('#dLeds').addEventListener('click', e => {
 });
 
 /* ---------------- PCs ---------------- */
-function renderPcs() {
-  const pcs = FLEET.pcs;
-  const seen = id => FLEET.devices.filter(d => (d.reach || []).some(r => r.agent === id && r.online)).length;
-  $('#tPcs').innerHTML = '<tr><th>PC</th><th>Status</th><th>Boards it reaches</th><th>Version</th><th>Last seen</th><th></th></tr>' + (pcs.length ? pcs.map(p =>
-    '<tr><td><b>' + esc(p.name) + '</b><div class="sub">' + esc(p.pc_name || '') + '</div></td><td><span class="tag ' + (p.online ? 'ok' : 'bad') + '">' + (p.online ? 'Connected' : 'Not connected') + '</span></td><td>' + seen(p.id) + '</td><td class="mono">' + esc(p.version || '') + '</td><td class="m">' + esc(p.online ? 'now' : ago(p.last_seen)) + '</td>' +
-    '<td class="r"><button class="btn danger" data-revoke="' + esc(p.id) + '">Remove</button></td></tr>').join('') : '<tr><td colspan="6" class="m">No Board Remote PC has joined yet. Make a code on the right.</td></tr>');
+const UPD = { waiting: ['warn', 'Waiting for approval'], scheduled: ['blue', 'Installs tonight'], downloading: ['blue', 'Downloading'], installing: ['blue', 'Installing'], done: ['ok', 'Updated'], failed: ['bad', 'Update failed'], rolled_back: ['bad', 'Rolled back'] };
+function updCell(p) {
+  const u = UPD[p.update_state]; if (!u) return '<span class="sub">' + (p.service ? 'Up to date' : 'Updates need the Windows app') + '</span>';
+  return '<span class="tag ' + u[0] + '">' + u[1] + (p.update_version ? ' ' + esc(p.update_version) : '') + '</span>' + (p.update_detail && p.update_state !== 'waiting' ? '<div class="sub">' + esc(p.update_detail) + '</div>' : '');
 }
-$('#tPcs').addEventListener('click', e => {
+function renderPcs() {
+  const pcs = FLEET.pcs, U = FLEET.hospital.updates || {};
+  const seen = id => FLEET.devices.filter(d => (d.reach || []).some(r => r.agent === id && r.online)).length;
+  const waiting = pcs.filter(p => p.update_state === 'waiting').length;
+  $('#updBar').innerHTML = '<span class="label">Updates</span><span>' + (U.update_mode === 'approve' ? 'Each update waits for approval here' : 'Install automatically overnight') + (U.update_ring === 'pilot' ? ', <b>pilot</b> (gets new versions first)' : '') + '</span>' +
+    (U.target ? '<span class="sub">Latest for this hospital: ' + esc(U.target) + '</span>' : '') +
+    (waiting > 1 ? '<button class="btn dark" id="apAll">Approve all ' + waiting + '</button>' : '') +
+    (isHci() ? '<select id="updMode" class="sel"><option value="auto">Automatic overnight</option><option value="approve">Wait for approval</option></select><label class="check"><input type="checkbox" id="updPilot"> Pilot</label>' : '');
+  if (isHci()) { $('#updMode').value = U.update_mode || 'auto'; $('#updPilot').checked = U.update_ring === 'pilot'; }
+  $('#tPcs').innerHTML = '<tr><th>PC</th><th>Status</th><th>Boards it reaches</th><th>Version</th><th>Update</th><th>Last seen</th><th></th></tr>' + (pcs.length ? pcs.map(p =>
+    '<tr><td><b>' + esc(p.name) + '</b><div class="sub">' + esc(p.pc_name || '') + '</div></td><td><span class="tag ' + (p.online ? 'ok' : 'bad') + '">' + (p.online ? 'Connected' : 'Not connected') + '</span></td><td>' + seen(p.id) + '</td><td class="mono">' + esc(p.version || '') + '</td><td>' + updCell(p) + '</td><td class="m">' + esc(p.online ? 'now' : ago(p.last_seen)) + '</td>' +
+    '<td class="r">' + (p.update_state === 'waiting' || (p.service && U.target && p.version !== U.target && ['downloading', 'installing'].indexOf(p.update_state) < 0) ? '<button class="btn dark" data-approve="' + esc(p.id) + '">' + (p.update_state === 'waiting' ? 'Approve' : 'Install now') + '</button> ' : '') + '<button class="btn danger" data-revoke="' + esc(p.id) + '">Remove</button></td></tr>').join('') : '<tr><td colspan="7" class="m">No Board Remote PC has joined yet. Make a code on the right.</td></tr>');
+}
+$('#updBar').addEventListener('change', async e => {
+  if (e.target.id !== 'updMode' && e.target.id !== 'updPilot') return;
+  const r = await api('PATCH', '/api/hospitals/' + H + '/updates', { updateMode: $('#updMode').value, updateRing: $('#updPilot').checked ? 'pilot' : 'normal' });
+  toast(r.message, !r.ok); loadFleet();
+});
+$('#updBar').addEventListener('click', async e => {
+  if (!e.target.closest('#apAll')) return;
+  const r = await api('POST', '/api/hospitals/' + H + '/approve', {}); toast(r.message, !r.ok); loadFleet();
+});
+$('#tPcs').addEventListener('click', async e => {
+  const a = e.target.closest('[data-approve]');
+  if (a) { const r = await api('POST', '/api/agents/' + a.dataset.approve + '/approve', {}); toast(r.message, !r.ok); return loadFleet(); }
   const b = e.target.closest('[data-revoke]'); if (!b) return;
   sure(b, 'Click again to remove', async () => { const r = await api('POST', '/api/agents/' + b.dataset.revoke + '/revoke', {}); toast(r.message, !r.ok); loadFleet(); });
 });
@@ -255,7 +278,8 @@ $('#fInvite').addEventListener('submit', async e => {
 const ACTION = { 'device.placement': 'Changed location', 'device.locked': 'Locked location', 'device.unlocked': 'Unlocked location', 'hospital.locked': 'Locked locations', 'hospital.unlocked': 'Unlocked locations',
   'command.act': 'Ran a fix', 'command.led': 'Set the door sign light', 'command.probe': 'Ran a health check', 'command.auditRun': 'Started the morning audit', 'command.result': 'Command finished',
   'person.invited': 'Added a person', 'person.removed': 'Removed a person', 'agent.enrolled': 'A PC joined', 'agent.revoked': 'Removed a PC', 'agent.code_created': 'Made a PC code', 'device.discovered': 'Found a new board', 'hospital.created': 'Added the hospital', 'hospital.updated': 'Changed the hospital',
-  'user.sign_in': 'Signed in' };
+  'user.sign_in': 'Signed in', 'update.approved': 'Approved an update', 'update.done': 'Board Remote updated', 'update.failed': 'Update failed', 'update.rolled_back': 'Update rolled back',
+  'hospital.update_settings': 'Changed how updates install' };
 let LOG = [];
 function detail(l) {
   const x = l.details || {};
@@ -263,6 +287,8 @@ function detail(l) {
   if (l.action === 'command.act') return (x.args && x.args.key) || '';
   if (l.action === 'command.led') return x.args ? x.args.color + ' ' + (x.args.mode || 'solid') : '';
   if (x.email) return x.email + (x.role ? ', ' + (roleNames[x.role] || x.role) : '');
+  if (/^update\./.test(l.action)) return [x.from ? x.from + ' to ' + x.to : x.version, x.detail].filter(Boolean).join('. ');
+  if (l.action === 'hospital.update_settings') return [x.mode === 'approve' ? 'wait for approval' : x.mode === 'auto' ? 'automatic overnight' : '', x.ring === 'pilot' ? 'pilot' : x.ring === 'normal' ? 'not pilot' : ''].filter(Boolean).join(', ');
   if (x.message) return x.message;
   return '';
 }
@@ -285,8 +311,9 @@ $('#btnCsv').addEventListener('click', () => {
 /* ---------------- HCI: hospitals and staff ---------------- */
 async function loadHci() {
   const [h, s] = await Promise.all([api('GET', '/api/hospitals'), api('GET', '/api/hci/people')]);
-  if (h.ok) $('#tHosp').innerHTML = '<tr><th>Hospital</th><th>Boards</th><th>Offline</th><th>Locked</th><th>PCs</th><th>Microsoft tenant</th><th></th></tr>' + h.hospitals.map(x =>
+  if (h.ok) $('#tHosp').innerHTML = '<tr><th>Hospital</th><th>Boards</th><th>Offline</th><th>Locked</th><th>PCs</th><th>Updates</th><th>Microsoft tenant</th><th></th></tr>' + h.hospitals.map(x =>
     '<tr><td><b>' + esc(x.name) + '</b></td><td>' + x.devices + '</td><td>' + (x.down ? '<span class="tag bad">' + x.down + '</span>' : '0') + '</td><td>' + x.locked + ' of ' + x.devices + '</td><td>' + x.pcsOnline + ' of ' + x.pcs + '</td>' +
+    '<td>' + (x.update_mode === 'approve' ? 'Approve' : 'Automatic') + (x.update_ring === 'pilot' ? ' <span class="tag blue">Pilot</span>' : '') + '</td>' +
     '<td class="mono">' + esc(x.entra_tenant_id || 'not set') + '</td><td class="r"><button class="btn" data-open="' + esc(x.id) + '">Open</button> <button class="btn" data-tid="' + esc(x.id) + '">Tenant</button></td></tr>').join('');
   if (s.ok) $('#tStaff').innerHTML = '<tr><th>Name</th><th>Role</th><th>Last sign in</th><th></th></tr>' + s.people.map(p =>
     '<tr><td><b>' + esc(p.name || p.email) + '</b><div class="sub">' + esc(p.email) + '</div></td><td>' + esc(roleNames[p.role] || 'No HCI role') + '</td><td class="m">' + esc(p.last_login ? ago(p.last_login) : 'never') + '</td>' +
@@ -319,6 +346,44 @@ $('#fStaff').addEventListener('submit', async e => {
   const r = await api('POST', '/api/hci/people', { email: $('#sEmail').value, role: $('#sRole').value });
   if (!r.ok) { $('#sErr').textContent = r.message; return; }
   toast(r.message); $('#sEmail').value = ''; loadHci();
+});
+
+/* ---------------- HCI: Board Remote releases ---------------- */
+const RSTAT = { draft: ['', 'Draft'], pilot: ['blue', 'Pilot hospitals'], everyone: ['ok', 'Everyone'], paused: ['bad', 'Paused'] };
+async function loadUpd() {
+  const r = await api('GET', '/api/releases');
+  if (!r.ok) return toast(r.message, true);
+  const pub = r.canPublish;
+  $('#tRel').innerHTML = '<tr><th>Version</th><th>Sent to</th><th>PCs on it</th><th>What changed</th><th>Added</th><th></th></tr>' + (r.releases.length ? r.releases.map(x => {
+    const st = RSTAT[x.status] || RSTAT.draft, next = [];
+    if (pub && x.status !== 'pilot' && x.status !== 'everyone') next.push(['pilot', 'Send to pilot']);
+    if (pub && x.status !== 'everyone') next.push(['everyone', 'Send to everyone']);
+    if (pub && (x.status === 'pilot' || x.status === 'everyone')) next.push(['paused', 'Pause']);
+    return '<tr><td class="mono"><b>' + esc(x.version) + '</b><div class="sub">' + esc(Math.round(x.size / 1024)) + ' KB · ' + esc(x.sha256.slice(0, 12)) + '</div></td><td><span class="tag ' + st[0] + '">' + st[1] + '</span></td><td>' + x.on_version + '</td><td class="m" style="max-width:320px">' + esc(x.notes) + '</td><td class="m">' + esc(ago(x.created_at)) + (x.created_by_name ? '<div class="sub">' + esc(x.created_by_name) + '</div>' : '') + '</td>' +
+      '<td class="r">' + next.map(([k, l]) => '<button class="btn' + (k === 'paused' ? ' danger' : k === 'everyone' ? ' dark' : '') + '" data-rel="' + esc(x.id) + '" data-st="' + k + '">' + l + '</button>').join(' ') + '</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="m">No release uploaded yet.</td></tr>');
+  $('#tRelPcs').innerHTML = '<tr><th>Hospital</th><th>PC</th><th>Version</th><th>Update</th><th>Mode</th></tr>' + (r.pcs.length ? r.pcs.map(p =>
+    '<tr><td>' + esc(p.hospital) + '</td><td><b>' + esc(p.name) + '</b><div class="sub">' + esc(p.pc_name || '') + (p.online ? '' : ' · not connected') + '</div></td><td class="mono">' + esc(p.version || '') + '</td><td>' + updCell(p) + '</td><td class="m">' + (p.update_mode === 'approve' ? 'Approve' : 'Automatic') + (p.update_ring === 'pilot' ? ', pilot' : '') + '</td></tr>').join('') : '<tr><td colspan="5" class="m">No PCs yet.</td></tr>');
+  $('#fRel').hidden = !pub;
+}
+$('#tRel').addEventListener('click', e => {
+  const b = e.target.closest('[data-rel]'); if (!b) return;
+  const go = async () => { const r = await api('POST', '/api/releases/' + b.dataset.rel + '/status', { status: b.dataset.st }); toast(r.message, !r.ok); loadUpd(); };
+  if (b.dataset.st === 'everyone') sure(b, 'Click again to send to every hospital', go); else go();
+});
+$('#rZip').addEventListener('change', () => { const m = /(\d+\.\d+\.\d+)/.exec(($('#rZip').files[0] || {}).name || ''); if (m && !$('#rVer').value) $('#rVer').value = m[1]; });
+const readAs = (f, how) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); how === 'text' ? r.readAsText(f) : r.readAsDataURL(f); });
+$('#fRel').addEventListener('submit', async e => {
+  e.preventDefault(); $('#rErr').textContent = '';
+  const z = $('#rZip').files[0], g = $('#rSig').files[0];
+  if (!z || !g) { $('#rErr').textContent = 'Pick both files from the build: the .zip and the .sig.'; return; }
+  $('#rGo').disabled = true; $('#rGo').textContent = 'Uploading…';
+  try {
+    const pkg = String(await readAs(z)).replace(/^data:[^,]*,/, ''), sig = String(await readAs(g, 'text')).trim();
+    const r = await api('POST', '/api/releases', { version: $('#rVer').value.trim(), notes: $('#rNotes').value, packageBase64: pkg, signature: sig });
+    if (!r.ok) { $('#rErr').textContent = r.message; return; }
+    toast(r.message); $('#fRel').reset(); loadUpd();
+  } finally { $('#rGo').disabled = false; $('#rGo').textContent = 'Upload as draft'; }
 });
 
 /* ---------------- shell ---------------- */

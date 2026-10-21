@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remote · Board Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231E1C19'/%3E%3Cpath d='M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='15' r='1.6' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+:root{
+  --ground:#F2EFE9; --card:#FFFFFF; --soft:#F6F4EF; --line:#E7E2D9;
+  --ink:#1E1C19; --ink2:#3A3733; --muted:#7A766F;
+  --green:#14A44D; --green-bg:#E2F4E8;
+  --amber:#C98204; --amber-bg:#FCF0D6;
+  --red:#D93A2F;   --red-bg:#FBE4E1;
+  --blue:#2563EB;  --blue-bg:#E3EBFD;
+  --grey:#8C877F;  --grey-bg:#ECE8E1;
+  --r:16px; --g:16px;
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ground);color:var(--ink);font:500 14px/1.4 var(--font);display:grid;grid-template-rows:auto 1fr;gap:var(--g);padding:var(--g);overflow:hidden}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+[hidden]{display:none!important}
+.label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--soft);font-weight:700;font-size:13px;white-space:nowrap;text-decoration:none;color:inherit}
+.btn:hover{background:var(--grey-bg)}
+.btn.dark{background:var(--ink);color:#fff}
+.btn.dark:hover{background:#34312c}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.link{font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:12px}
+.link:hover{color:var(--ink)}
+.link.danger{color:var(--red)}
+
+.top{background:var(--card);border-radius:var(--r);padding:10px 14px;display:grid;grid-template-columns:auto auto 1fr auto;gap:18px;align-items:center}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:40px;height:40px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.brand .mark svg{width:22px;height:22px}
+.brand .kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1;white-space:nowrap}
+.nav{display:inline-flex;padding:4px;border-radius:999px;background:var(--soft);gap:2px}
+.nav a{height:34px;padding:0 14px;border-radius:999px;color:var(--muted);font-weight:800;font-size:13px;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;text-decoration:none}
+.nav a.on{background:var(--ink);color:#fff}
+.nav a svg{width:14px;height:14px}
+.actions-top{display:flex;gap:8px}
+
+.rgrid{min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.1fr);gap:var(--g)}
+#cloudCard .row{display:flex;gap:8px;flex-wrap:wrap}
+.card{background:var(--card);border-radius:var(--r);padding:20px;display:grid;gap:16px;align-content:start;min-height:0}
+.card h2{margin:0;font-size:17px;font-weight:800}
+.card .sub{margin:-10px 0 0;color:var(--muted);font-size:13px}
+
+.state{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;background:var(--soft);border-radius:14px;padding:14px}
+.state .d{width:14px;height:14px;border-radius:50%;background:var(--grey);margin:0 4px}
+.state.connected .d{background:var(--green);box-shadow:0 0 0 5px var(--green-bg)}
+.state.connecting .d{background:var(--blue);box-shadow:0 0 0 5px var(--blue-bg);animation:pulse 1.2s infinite}
+.state.error .d{background:var(--red);box-shadow:0 0 0 5px var(--red-bg)}
+.state .w{font-weight:800;font-size:16px}
+.state .m{font-size:12.5px;color:var(--muted);margin-top:2px}
+@keyframes pulse{50%{opacity:.35}}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;font-size:13px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;font-weight:700;overflow-wrap:anywhere}
+.field{display:grid;gap:6px}
+.field label{font-size:12px;font-weight:700;color:var(--ink2)}
+.field input{height:44px;border-radius:10px;border:2px solid var(--line);padding:0 12px;font:600 15px var(--font);outline:0;background:#fff}
+.field input:focus{border-color:var(--ink)}
+.field input.code{font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.err{color:var(--red);font-weight:600;font-size:13px;min-height:18px}
+
+.pol{display:grid;gap:8px}
+.opt{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;border:2px solid var(--line);border-radius:14px;padding:12px 14px}
+.opt .ck{width:22px;height:22px;border-radius:50%;background:var(--green-bg);color:var(--green);display:grid;place-items:center;margin-top:1px}
+.opt .ck svg{width:14px;height:14px;stroke-width:3}
+.opt b{display:block;font-size:14px;font-weight:800;color:var(--ink)}
+.opt span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.agree{background:var(--soft);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.45}
+.agree b{font-weight:800}
+.note{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--ink2);background:var(--blue-bg);border-radius:12px;padding:10px 12px}
+.note svg{color:var(--blue);margin-top:1px}
+
+.acts{display:grid;align-content:start;overflow:auto;min-height:0;margin:0 -20px -20px;padding:0 20px 20px}
+.act{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.act:first-child{border-top:0}
+.act .t{font:600 12px var(--mono);color:var(--muted);padding-top:1px}
+.act .w{font-weight:700}
+.act .b{color:var(--muted);font-size:12px}
+.act.no .w{color:var(--red)}
+.empty{color:var(--muted);font-size:13px}
+.toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:50;width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-weight:600;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.toast.err{background:var(--red)}
+@media (max-width:1300px){.brand h1{font-size:18px}}
+@media (max-width:1100px){body{overflow:auto;height:auto}.rgrid{grid-template-columns:1fr}.acts{max-height:420px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="mark"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
+  </div>
+  <nav class="nav" aria-label="Views">
+    <a href="/"><svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4"/></svg>Boards</a>
+    <a href="/health"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8l1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>Device health</a>
+    <a href="/health#new"><svg viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></svg>New devices</a>
+    <a href="/deploy"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Deploy</a>
+    <a href="/audit"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Audit</a>
+    <a class="on" href="/remote"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1"/></svg>Remote</a>
+  </nav>
+  <div></div>
+  <div class="actions-top">
+    <a class="btn" href="/manual#remote" title="Manual"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg><span>Manual</span></a>
+  </div>
+</header>
+
+<main class="rgrid">
+  <section class="card">
+    <h2>HCI ONE Remote</h2>
+    <p class="sub">Lets HCI support see and fix this site's boards from anywhere. This PC dials out; nothing here is opened to the internet.</p>
+    <div class="state" id="state"><span class="d"></span><div><div class="w" id="stWord">Checking…</div><div class="m" id="stMsg"></div></div></div>
+    <div id="joined" hidden>
+      <dl class="kv">
+        <dt>Site</dt><dd id="kSite"></dd>
+        <dt>Relay</dt><dd id="kUrl"></dd>
+        <dt>Connected</dt><dd id="kSince"></dd>
+      </dl>
+    </div>
+    <form id="join" hidden autocomplete="off">
+      <div class="field"><label for="url">Relay address</label><input id="url" value="" placeholder="relay address from HCI" spellcheck="false"></div>
+      <div class="field"><label for="code">Enrollment code from HCI</label><input id="code" class="code" maxlength="12" placeholder="8 letters and numbers" spellcheck="false"></div>
+      <div class="err" id="joinErr"></div>
+      <button class="btn dark" id="btnJoin" type="submit">Connect this site</button>
+    </form>
+  </section>
+
+  <section class="card" id="cloudCard">
+    <h2>HCI ONE Cloud</h2>
+    <p class="sub">Shares this PC's boards with the hospital's web dashboard and the other Board Remote PCs here. Rooms and health only. Screens, screen text and logs never leave this PC.</p>
+    <div class="state" id="cState"><span class="d"></span><div><div class="w" id="cWord">Checking…</div><div class="m" id="cMsg"></div></div></div>
+    <div id="cJoined" hidden>
+      <dl class="kv">
+        <dt>Hospital</dt><dd id="cHosp"></dd>
+        <dt>Cloud</dt><dd id="cUrl"></dd>
+        <dt>Boards shared</dt><dd id="cBoards"></dd>
+      </dl>
+      <div class="row"><button class="btn" id="cLeave" type="button">Leave the cloud</button></div>
+    </div>
+    <form id="cJoin" hidden autocomplete="off">
+      <div class="field"><label for="cUrlIn">Cloud address</label><input id="cUrlIn" value="https://remote.hci-tv.com" spellcheck="false"></div>
+      <div class="field"><label for="cCode">Code from the web dashboard (PCs, Add this PC)</label><input id="cCode" class="code" maxlength="14" placeholder="XXXX XXXX XXXX" spellcheck="false"></div>
+      <div class="err" id="cErr"></div>
+      <button class="btn dark" id="cBtn" type="submit">Join the cloud</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>What HCI can do here</h2>
+    <p class="sub">HCI support's access to this site's boards.</p>
+    <div class="pol">
+      <div class="opt"><span class="ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Health</b><span>Board status, heartbeat and alerts.</span></span></div>
+      <div class="opt"><span class="ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Fixes</b><span>Restart the app, reboot, and wake the screen.</span></span></div>
+      <div class="opt"><span class="ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Live view</b><span>See and touch a board's screen.</span></span></div>
+    </div>
+    <div class="agree" id="agree"></div>
+    <div class="note"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>Screens can show patient details. Every look and every action is logged here and at HCI, and a bar shows on this PC while HCI is viewing a board.</span></div>
+  </section>
+
+  <section class="card" style="grid-template-rows:auto auto minmax(0,1fr)">
+    <h2>Activity</h2>
+    <p class="sub">What HCI did on this site, newest first.</p>
+    <div class="acts" id="acts"></div>
+  </section>
+</main>
+<div class="toasts" id="toasts"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+let D = null;
+function toast(msg, bad) {
+  const t = document.createElement('div'); t.className = 'toast' + (bad ? ' err' : ''); t.textContent = msg;
+  $('#toasts').append(t); setTimeout(() => t.remove(), 4200);
+}
+async function api(p, body) {
+  try {
+    const r = await fetch(p, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Board-Remote': '1' }, body: JSON.stringify(body) } : { cache: 'no-store' });
+    return await r.json();
+  } catch (e) { return { ok: false, message: 'Board Remote is not running.' }; }
+}
+const clock = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+function ago(t) {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return s + ' s ago';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  return clock(t) + ', ' + new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+const WORD = { connected: 'Connected', connecting: 'Connecting', setup: 'Not set up', off: 'Off', error: 'Needs a look' };
+function render() {
+  if (!D) return;
+  const st = $('#state');
+  st.className = 'state ' + D.status;
+  $('#stWord').textContent = WORD[D.status] || D.status;
+  $('#stMsg').textContent = D.message || '';
+  const enrolled = D.enrolled;
+  $('#joined').hidden = !enrolled;
+  $('#join').hidden = enrolled;
+  $('#agree').innerHTML = enrolled
+    ? '<b>Agreed when this site was connected' + (D.enrolledAt ? ' on ' + esc(new Date(D.enrolledAt).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })) : '') + '.</b> HCI does not ask again before helping, and Remote stays on, also after a restart. Only HCI can disconnect this site.'
+    : '<b>Connecting this site with HCI\'s code gives HCI this access.</b> After that nobody here is asked again, and Remote stays on until HCI disconnects the site.';
+  $('#kSite').textContent = D.siteName || '';
+  $('#kUrl').textContent = D.url || '';
+  $('#kSince').textContent = D.connectedAt ? ago(D.connectedAt) : 'Not now';
+  if (!enrolled && D.url && !$('#url').dataset.touched) { $('#url').value = D.url.replace(/^https:\/\//, ''); $('#url').dataset.touched = '1'; }
+  const acts = D.activity || [];
+  $('#acts').innerHTML = acts.length ? acts.map(a => '<div class="act' + (a.ok ? '' : ' no') + '"><span class="t">' + esc(clock(a.at)) + '</span><div><div class="w">' + esc((a.who ? a.who + ': ' : '') + a.what) + '</div>' + (a.board ? '<div class="b">' + esc(a.board) + '</div>' : '') + '</div></div>').join('')
+    : '<p class="empty">Nothing yet. Requests and actions from HCI show here.</p>';
+}
+async function poll() { const d = await api('/api/remote?full=1'); if (d && d.status) { D = d; render(); } }
+$('#url').oninput = () => { $('#url').dataset.touched = '1'; };
+$('#join').onsubmit = async e => {
+  e.preventDefault();
+  $('#joinErr').textContent = '';
+  $('#btnJoin').disabled = true; $('#btnJoin').textContent = 'Connecting…';
+  const d = await api('/api/remote/enroll', { url: $('#url').value, code: $('#code').value });
+  $('#btnJoin').disabled = false; $('#btnJoin').textContent = 'Connect this site';
+  if (!d.ok) { $('#joinErr').textContent = d.message || 'That did not work.'; return; }
+  $('#code').value = '';
+  toast(d.message);
+  poll();
+};
+poll();
+setInterval(poll, 2000);
+let CS = null;
+function renderCloud() {
+  if (!CS) return;
+  const st = !CS.enrolled ? 'setup' : CS.connected ? 'connected' : CS.lastError ? 'error' : 'connecting';
+  $('#cState').className = 'state ' + st;
+  $('#cWord').textContent = WORD[st];
+  $('#cMsg').textContent = !CS.enrolled ? 'Not joined. Optional: Board Remote works the same without it.' : CS.connected ? 'Connected ' + ago(CS.since) + '.' : (CS.lastError || 'Reaching the cloud. Board Remote keeps working while it tries.');
+  $('#cJoined').hidden = !CS.enrolled; $('#cJoin').hidden = CS.enrolled;
+  $('#cHosp').textContent = CS.hospital ? CS.hospital.name : '';
+  $('#cUrl').textContent = (CS.url || '').replace(/^https?:\/\//, '');
+  $('#cBoards').textContent = CS.known + ' of ' + CS.boards + (CS.known < CS.boards ? ' (the rest once they answer with a MAC or serial)' : '') + (CS.locked ? '. ' + CS.locked + ' with rooms locked by HCI' : '');
+}
+async function pollCloud() { const d = await api('/api/cloud/state'); if (d && d.ok) { CS = d; renderCloud(); } }
+$('#cJoin').onsubmit = async e => {
+  e.preventDefault(); $('#cErr').textContent = '';
+  $('#cBtn').disabled = true; $('#cBtn').textContent = 'Joining…';
+  const d = await api('/api/cloud/enroll', { url: $('#cUrlIn').value, code: $('#cCode').value });
+  $('#cBtn').disabled = false; $('#cBtn').textContent = 'Join the cloud';
+  if (!d.ok) { $('#cErr').textContent = d.message || 'That did not work.'; return; }
+  $('#cCode').value = ''; toast(d.message); pollCloud();
+};
+$('#cLeave').onclick = async () => {
+  if ($('#cLeave').dataset.sure !== '1') { $('#cLeave').dataset.sure = '1'; $('#cLeave').textContent = 'Click again to leave'; setTimeout(() => { $('#cLeave').dataset.sure = ''; $('#cLeave').textContent = 'Leave the cloud'; }, 4000); return; }
+  const d = await api('/api/cloud/leave', {}); toast(d.message, !d.ok); pollCloud();
+};
+pollCloud();
+setInterval(pollCloud, 3000);
+</script>
+<script src="/remote-banner.js"></script>
+</body>
+</html>

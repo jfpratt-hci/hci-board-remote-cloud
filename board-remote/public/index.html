@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='5' width='28' height='19' rx='4' fill='%231E1C19'/%3E%3Ccircle cx='24' cy='11' r='3' fill='%2314A44D'/%3E%3Crect x='11' y='26' width='10' height='3' rx='1.5' fill='%231E1C19'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+:root{
+  --ground:#F2EFE9; --card:#FFFFFF; --soft:#F6F4EF; --line:#E7E2D9;
+  --ink:#1E1C19; --ink2:#3A3733; --muted:#7A766F;
+  --green:#14A44D; --green-bg:#E2F4E8;
+  --amber:#C98204; --amber-bg:#FCF0D6;
+  --red:#D93A2F;   --red-bg:#FBE4E1;
+  --blue:#2563EB;  --blue-bg:#E3EBFD;
+  --grey:#8C877F;  --grey-bg:#ECE8E1;
+  --screen:#17160F;
+  --r:16px; --g:16px;
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--ground);color:var(--ink);font:500 14px/1.4 var(--font);display:grid;grid-template-rows:auto 1fr auto;gap:var(--g);padding:var(--g);overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--soft);font-weight:700;font-size:13px;white-space:nowrap;transition:background .15s, transform .05s;color:inherit}
+a.btn{text-decoration:none}
+.btn:hover{background:var(--grey-bg)}
+.btn:active{transform:translateY(1px)}
+.btn.dark{background:var(--ink);color:#fff}
+.btn.dark:hover{background:#34312c}
+.btn.green{background:var(--green);color:#fff}
+.btn.green:hover{background:#0f8e41}
+.btn.danger{color:var(--red)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.icon-btn{width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.icon-btn:hover{background:var(--soft);color:var(--ink)}
+
+/* top bar */
+.top{background:var(--card);border-radius:var(--r);padding:10px 14px;display:grid;grid-template-columns:auto auto 1fr auto;gap:18px;align-items:center}
+.nav{display:inline-flex;padding:4px;border-radius:999px;background:var(--soft);gap:2px}
+.nav a{height:34px;padding:0 14px;border-radius:999px;color:var(--muted);font-weight:800;font-size:13px;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;text-decoration:none}
+.nav a.on{background:var(--ink);color:#fff}
+.nav a svg{width:14px;height:14px}
+.nav .cnt{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11px;display:inline-grid;place-items:center}
+@media (max-width:1720px){.actions-top .btn span{display:none}.actions-top .btn{padding:0 12px}}
+.foot .summary{flex-wrap:nowrap;flex:none}
+.foot .chip{height:26px;padding:0 10px;font-size:11.5px}
+@media (max-width:1100px){.foot .summary{display:none}}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:40px;height:40px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.brand .mark svg{width:22px;height:22px}
+.brand .kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1;white-space:nowrap}
+.summary{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:999px;font-weight:700;font-size:12px;background:var(--soft);color:var(--ink2)}
+.chip b{font-weight:800}
+.chip .d{width:8px;height:8px;border-radius:50%}
+.chip.ok{background:var(--green-bg)} .chip.ok .d{background:var(--green)}
+.chip.warn{background:var(--amber-bg)} .chip.warn .d{background:var(--amber)}
+.chip.bad{background:var(--red-bg)} .chip.bad .d{background:var(--red)}
+.chip.idle .d{background:var(--grey)}
+.chip.usb{background:var(--blue-bg);color:var(--blue);cursor:pointer}
+.chip.usb:hover{filter:brightness(.97)}
+.actions-top{display:flex;gap:8px}
+.filters{display:flex;gap:8px;justify-content:flex-end;min-width:0;grid-column:3}
+.top .actions-top{grid-column:4}
+/* a big site shows the filter: action buttons go to icons (Connect all keeps its words), and on narrow screens the name hides */
+.many .actions-top .btn:not(#btnAll) span{display:none}
+.many .actions-top .btn:not(#btnAll){padding:0 12px}
+@media (max-width:1420px){.many .brand > div:last-child{display:none}}
+.filters .search{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:12px;background:var(--soft);min-width:0;flex:0 1 210px;color:var(--muted);cursor:text}
+.filters .search svg{width:16px;height:16px}
+.filters .search input{border:0;background:none;outline:0;font:600 13px var(--font);color:var(--ink);min-width:0;width:100%;padding:0}
+.filters .search:focus-within{box-shadow:0 0 0 2px var(--ink)}
+.filters .show{height:40px;border-radius:12px;border:0;background:var(--soft);padding:0 8px 0 12px;font:700 13px var(--font);color:var(--ink);min-width:0;flex:0 1 auto;max-width:220px;cursor:pointer;outline:0}
+.filters.on .show{background:var(--ink);color:#fff}
+.nomatch{grid-column:1/-1;background:var(--card);border-radius:var(--r);padding:24px;display:flex;gap:16px;align-items:center;justify-content:center;color:var(--muted)}
+.nomatch b{color:var(--ink)}
+
+/* board grid */
+main{min-height:0;overflow:auto}
+.grid{display:grid;gap:var(--g);justify-content:center;align-content:start;grid-template-columns:repeat(var(--cols,3),var(--cardw,360px))}
+.card{background:var(--card);border-radius:var(--r);padding:12px;display:grid;gap:12px;position:relative;transition:box-shadow .15s;container-type:inline-size}
+.card.dropping{box-shadow:0 0 0 3px var(--blue)}
+.head{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;min-height:40px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--grey);margin:0 4px}
+.ok .dot{background:var(--green);box-shadow:0 0 0 4px var(--green-bg)}
+.warn .dot{background:var(--amber);box-shadow:0 0 0 4px var(--amber-bg)}
+.bad .dot{background:var(--red);box-shadow:0 0 0 4px var(--red-bg)}
+.info .dot{background:var(--blue);box-shadow:0 0 0 4px var(--blue-bg);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.name{font-weight:800;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{height:26px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em;display:inline-flex;align-items:center;background:var(--grey-bg);color:var(--ink2);white-space:nowrap}
+.ok .pill{background:var(--green-bg);color:var(--green)}
+.warn .pill{background:var(--amber-bg);color:var(--amber)}
+.bad .pill{background:var(--red-bg);color:var(--red)}
+.info .pill{background:var(--blue-bg);color:var(--blue)}
+
+.screen{position:relative;aspect-ratio:16/9;border-radius:12px;background:var(--screen);overflow:hidden;cursor:pointer;display:grid;place-items:center}
+.screen img{min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;display:block;opacity:0;transition:opacity .2s}
+.card.has-shot .screen img{opacity:1}
+.veil{position:absolute;inset:0;display:grid;place-content:center;gap:6px;text-align:center;padding:16px;color:#fff;background:rgba(23,22,15,.82)}
+.veil-title{font-weight:800;font-size:15px}
+.veil-text{font-size:12px;color:#CFCAC1;max-width:320px;margin:auto}
+.card.ok .veil{display:none}
+.card.ok.no-shot .veil{display:grid;background:transparent}
+.badge{position:absolute;left:8px;top:8px;height:24px;padding:0 10px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;gap:6px}
+.card.asleep .badge{display:inline-flex}
+.zoom{position:absolute;right:8px;bottom:8px;height:28px;padding:0 10px;border-radius:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;opacity:0;transition:opacity .15s}
+.screen:hover .zoom{opacity:1}
+.zoom svg{width:14px;height:14px}
+.drop{position:absolute;inset:0;display:none;place-content:center;background:rgba(37,99,235,.88);color:#fff;font-weight:800;text-align:center}
+.card.dropping .drop{display:grid}
+
+.meta{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;min-height:24px}
+.addr{font:600 12px var(--mono);color:var(--ink2);background:var(--soft);border-radius:8px;height:24px;padding:0 8px;display:inline-flex;align-items:center;gap:6px}
+.addr:hover{background:var(--grey-bg)}
+.addr svg{width:12px;height:12px;color:var(--muted)}
+.app{font:500 12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.row .btn{padding:0 8px}
+
+/* empty state */
+.grid.is-empty{display:block}
+.empty{max-width:1080px;margin:5vh auto 0;background:var(--card);border-radius:var(--r);padding:32px;display:grid;gap:24px}
+.empty h2{margin:0;font-size:24px;font-weight:800}
+.empty p{margin:0;color:var(--muted)}
+.ways{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.way{background:var(--soft);border-radius:14px;padding:16px;display:grid;gap:8px;align-content:start}
+.way .btn{justify-self:start;margin-top:8px}
+.way h3{margin:0;font-size:15px;font-weight:800}
+.way p{font-size:13px}
+
+/* footer */
+.foot{display:flex;gap:16px;align-items:center;color:var(--muted);font-size:12px}
+.foot .grow{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:inline-flex;background:var(--card);border-radius:10px;padding:3px;gap:2px}
+.seg button{height:26px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:700;color:var(--muted)}
+.seg button.on{background:var(--ink);color:#fff}
+.linkbtn{font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.linkbtn:hover{color:var(--ink)}
+
+/* menu */
+.menu{position:fixed;z-index:30;background:var(--card);border-radius:12px;padding:6px;min-width:220px;box-shadow:0 12px 40px rgba(30,28,25,.18)}
+.menu button{display:flex;gap:10px;align-items:center;width:100%;height:36px;padding:0 10px;border-radius:8px;font-weight:600;font-size:13px;text-align:left}
+.menu button:hover{background:var(--soft)}
+.menu button.danger{color:var(--red)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+
+/* focus view */
+.focus{position:fixed;inset:0;z-index:20;background:rgba(23,22,15,.92);display:grid;grid-template-columns:1fr 296px;gap:var(--g);padding:var(--g)}
+.focus[hidden]{display:none}
+.stage{min-width:0;min-height:0;display:grid;place-items:center;position:relative}
+.fscreen{position:relative;max-width:100%;max-height:100%;display:grid;place-items:center;height:100%;width:100%}
+.fscreen img,.fscreen canvas{max-width:100%;max-height:calc(100vh - 32px);display:block;border-radius:10px;cursor:crosshair;user-select:none;-webkit-user-drag:none;touch-action:none;background:#000}
+.fmode{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;border-radius:999px;font-size:12px;font-weight:800;justify-self:start;background:var(--grey-bg);color:var(--ink2)}
+.fmode .d{width:8px;height:8px;border-radius:50%;background:var(--grey)}
+.fmode.live{background:var(--green-bg);color:var(--green)} .fmode.live .d{background:var(--green)}
+.fmode.wait{background:var(--blue-bg);color:var(--blue)} .fmode.wait .d{background:var(--blue);animation:pulse 1.2s infinite}
+.ripple{position:fixed;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid #fff;pointer-events:none;animation:rip .5s ease-out forwards}
+@keyframes rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.4);opacity:0}}
+.fwait{position:absolute;color:#CFCAC1;font-weight:700}
+.side{background:var(--card);border-radius:var(--r);padding:16px;display:grid;gap:12px;align-content:start;overflow:auto}
+.side .fhead{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+.side .fname{font-size:18px;font-weight:800;line-height:1.2}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keys .btn{height:56px;flex-direction:column;gap:4px;font-size:11px;padding:0 4px}
+.stack{display:grid;gap:8px}
+.stack .btn{justify-content:flex-start}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.fstat{font:600 11px var(--mono);color:var(--muted)}
+
+/* dialogs */
+dialog{border:0;border-radius:var(--r);padding:24px;width:min(520px,calc(100vw - 32px));box-shadow:0 24px 64px rgba(30,28,25,.25);color:var(--ink);font:500 14px/1.4 var(--font)}
+dialog::backdrop{background:rgba(23,22,15,.45)}
+dialog h2{margin:0 0 16px;font-size:20px;font-weight:800}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field .sel{height:44px;border-radius:10px;border:2px solid var(--line);padding:0 10px;font:600 15px var(--font);color:var(--ink);background:#fff}
+.fields .full{grid-column:1/-1}
+.field{display:grid;gap:6px}
+.field input[type=text],.field input[type=number]{height:44px;border-radius:10px;border:2px solid var(--line);padding:0 12px;font:600 15px var(--font);color:var(--ink);outline:0}
+.field input:focus{border-color:var(--ink)}
+.check{display:flex;gap:10px;align-items:center;font-weight:600}
+.check input{width:18px;height:18px;accent-color:var(--ink)}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.dlg-actions .spacer{flex:1}
+.formerr{color:var(--red);font-weight:600;font-size:13px;min-height:18px;margin-top:8px}
+.found{display:grid;gap:8px;max-height:50vh;overflow:auto}
+.found .fr{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:var(--soft);border-radius:10px;padding:8px 8px 8px 12px}
+.found .ip{font:700 14px var(--mono)}
+.found .k{font-size:12px;color:var(--muted)}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ink);animation:sp 0.8s linear infinite;margin:8px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.muted{color:var(--muted)}
+
+/* toasts */
+.toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:50;width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-weight:600;font-size:13px;white-space:pre-line;box-shadow:0 10px 30px rgba(0,0,0,.2);animation:tin .2s ease-out}
+.toast.err{background:var(--red)}
+.toast code{font-family:var(--mono);background:rgba(255,255,255,.15);padding:2px 6px;border-radius:6px;user-select:all}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+/* narrow cards: icons only, status shown by the dot */
+@container (max-width:330px){.row .btn span,.app,.pill,.veil-text{display:none}}
+</style>
+<style>html:not(.hci-remote-on) .navRemote{display:none!important}</style>
+<script>try{if(localStorage.getItem('hciRemoteOn'))document.documentElement.classList.add('hci-remote-on')}catch(e){}</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="mark"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
+  </div>
+  <nav class="nav" aria-label="Views">
+    <a class="on" href="/"><svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4"/></svg>Boards</a>
+    <a href="/health"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8l1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>Device health<span class="cnt" id="navIssues" hidden></span></a>
+    <a href="/health#new"><svg viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></svg>New devices<span class="cnt" id="navNew" hidden></span></a>
+    <a href="/deploy"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Deploy</a>
+    <a href="/audit"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Audit</a>
+    <a class="navRemote" href="/remote"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1"/></svg>Remote</a>
+  </nav>
+  <div class="filters" id="filters" hidden>
+    <label class="search" title="Find a room, name or IP"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="q" type="search" placeholder="Room or IP" autocomplete="off" spellcheck="false"></label>
+    <select class="show" id="show" title="Show"></select>
+  </div>
+  <div class="actions-top">
+    <a class="btn" id="btnImport" href="/deploy#import" title="Import a room list" style="text-decoration:none"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Import rooms</span></a>
+    <button class="btn" id="btnScan" title="Find boards"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Find boards</span></button>
+    <button class="btn" id="btnUsb" title="USB to WiFi"><svg viewBox="0 0 24 24"><path d="M5 12.5a10 10 0 0 1 14 0M1.5 9a15 15 0 0 1 21 0M8.5 16a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></svg><span>USB to WiFi</span></button>
+    <button class="btn" id="btnAdd" title="Add board"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Add board</span></button>
+    <button class="btn" id="btnSnap" title="Snapshots for audits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l2-3h4l2 3"/><circle cx="12" cy="13" r="3.2"/></svg><span>Snapshots</span></button>
+    <a class="btn" href="/manual#boards" title="Manual"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg><span>Manual</span></a>
+    <button class="btn dark" id="btnAll" title="Connect all"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg><span>Connect all</span></button>
+  </div>
+</header>
+
+<main id="main"><div class="grid" id="grid"></div></main>
+
+<footer class="foot">
+  <div class="summary" id="summary"></div>
+  <span class="grow" id="footInfo">Starting…</span>
+  <span>Screens</span>
+  <div class="seg" id="seg"><button data-v="live">Live</button><button data-v="normal">Normal</button><button data-v="off">Off</button></div>
+  <a class="linkbtn" id="remoteLink" href="/remote" title="HCI ONE Remote">Remote</a>
+  <button class="linkbtn" id="btnStop">Stop Board Remote</button>
+</footer>
+
+<!-- focus view -->
+<div class="focus" id="focus" hidden>
+  <div class="stage"><div class="fscreen" id="fscreen"><img id="fimg" alt="Board screen" draggable="false"><canvas id="fcanvas" style="display:none"></canvas><div class="fwait" id="fwait">Loading screen…</div></div></div>
+  <aside class="side">
+    <div class="fhead">
+      <div><div class="label">Board</div><div class="fname" id="fname"></div><div class="sub" id="fsub"></div></div>
+      <button class="icon-btn" id="fclose" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="fmode" id="fmode"></div>
+    <p class="hint">Click the screen to tap. Drag to swipe. Esc closes.</p>
+    <div class="label">Navigate</div>
+    <div class="keys">
+      <button class="btn" data-key="back"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back</button>
+      <button class="btn" data-key="home"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+      <button class="btn" data-key="recents"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Recents</button>
+    </div>
+    <div class="label">Screen and sound</div>
+    <div class="keys">
+      <button class="btn" data-key="wake"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Wake</button>
+      <button class="btn" data-key="sleep"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>Sleep</button>
+      <button class="btn" data-key="power"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>Power</button>
+      <button class="btn" data-key="voldown"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M16 12h5"/></svg>Vol down</button>
+      <button class="btn" data-key="mute"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>Mute</button>
+      <button class="btn" data-key="volup"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M16 12h5M18.5 9.5v5"/></svg>Vol up</button>
+    </div>
+    <div class="label">Open</div>
+    <div class="stack">
+      <button class="btn dark" id="fmirror"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Live mirror with full control</button>
+      <button class="btn" id="fshell"><svg viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></svg>Shell window</button>
+    </div>
+    <div class="label">Fix</div>
+    <div class="stack">
+      <button class="btn" id="frestart"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Restart the app on screen</button>
+      <button class="btn danger" id="freboot"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>Reboot board</button>
+    </div>
+    <div class="fstat" id="fstat"></div>
+  </aside>
+</div>
+
+<!-- add / edit -->
+<dialog id="dlgBoard">
+  <form method="dialog" id="formBoard">
+    <h2 id="dlgTitle">Add board</h2>
+    <div class="fields">
+      <label class="field full"><span class="label">Name</span><input type="text" id="fName" placeholder="Room 412 whiteboard" maxlength="60"></label>
+      <label class="field"><span class="label">IP address</span><input type="text" id="fHost" placeholder="192.168.4.31" autocomplete="off" spellcheck="false"></label>
+      <label class="field"><span class="label">Port</span><input type="number" id="fPort" value="5555" min="1" max="65535"></label>
+      <label class="field"><span class="label">Type</span><select id="fKind" class="sel"><option value="wb">Whiteboard</option><option value="ds">Door sign</option><option value="tv">Patient TV</option><option value="cam">Camera</option><option value="tab">Tablet</option><option value="usb">Unit Status Board</option></select></label>
+      <label class="field"><span class="label">Room</span><input type="text" id="fRoom" maxlength="20" placeholder="412"></label>
+      <label class="field"><span class="label">Unit</span><input type="text" id="fUnit" maxlength="40" placeholder="4 West"></label>
+      <label class="field"><span class="label">Closet</span><input type="text" id="fCloset" maxlength="40" placeholder="IDF 4A"></label>
+      <label class="field full"><span class="label">App to watch (optional)</span><input type="text" id="fApp" placeholder="com.hci.one.board" spellcheck="false"></label>
+      <label class="check full"><input type="checkbox" id="fAuto" checked> Keep this board connected all the time</label>
+    </div>
+    <div class="formerr" id="formErr"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="dlgRemove" hidden>Remove</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="dlgCancel">Cancel</button>
+      <button type="submit" class="btn dark" id="dlgSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- scan -->
+<dialog id="dlgScan">
+  <h2>Find boards</h2>
+  <div id="scanBody"></div>
+  <div class="dlg-actions">
+    <span class="spacer"></span>
+    <button type="button" class="btn" id="scanAgain">Scan again</button>
+    <button type="button" class="btn" id="scanClose">Close</button>
+    <button type="button" class="btn dark" id="scanAddAll" hidden>Add all new</button>
+  </div>
+</dialog>
+
+<!-- snapshots -->
+<dialog id="dlgSnap" style="max-width:860px;width:92vw">
+  <h2>Snapshots</h2>
+  <p class="hint" style="margin:-6px 0 10px">Save a picture of each board's screen to a folder, so you can line up what was on a board against the messages that came in.</p>
+  <div class="dlg-actions" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">
+    <button type="button" class="btn dark" id="snapAll"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13" r="3.2"/></svg>Capture all connected</button>
+    <button type="button" class="btn" id="snapRefresh">Refresh</button>
+    <button type="button" class="btn" id="snapOpen">Open folder</button>
+    <span class="spacer"></span>
+    <button type="button" class="btn" id="snapClose">Close</button>
+  </div>
+  <div class="field full" style="margin:8px 0"><span class="label">Folder, interval and how long to keep</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="snapDirIn" placeholder="Default: the snapshots folder next to Board Remote" style="flex:1;min-width:220px;height:40px;border:2px solid var(--line);border-radius:10px;padding:0 10px;font:600 14px var(--font);color:var(--ink);background:#fff">
+      <label style="font-size:13px">Every <input type="number" id="snapEvery" min="0" max="1440" value="0" style="width:64px;height:40px;border:2px solid var(--line);border-radius:10px;padding:0 8px"> min (0 is off)</label>
+      <label style="font-size:13px">Keep <input type="number" id="snapKeep" min="1" max="365" value="14" style="width:64px;height:40px;border:2px solid var(--line);border-radius:10px;padding:0 8px"> days</label>
+      <button type="button" class="btn dark" id="snapSave">Save</button>
+    </div>
+  </div>
+  <div id="snapGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:52vh;overflow:auto;margin-top:4px"></div>
+</dialog>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const IC = {
+  plug: '<svg viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></svg>',
+  unplug: '<svg viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/><path d="M2 2l20 20"/></svg>',
+  monitor: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  term: '<svg viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></svg>',
+  more: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  edit: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  restart: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+  power: '<svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  expand: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+  moon: '<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>'
+};
+
+/* ---------- helpers ---------- */
+async function api(path, body, opts) {
+  opts = opts || {};
+  const init = { method: body === undefined && !opts.raw ? 'GET' : 'POST', headers: { 'X-Board-Remote': '1' } };
+  if (opts.raw) { init.body = opts.raw; init.headers['Content-Type'] = 'application/octet-stream'; }
+  else if (body !== undefined) { init.body = JSON.stringify(body); init.headers['Content-Type'] = 'application/json'; }
+  try {
+    const r = await fetch(path, init);
+    const t = await r.text();
+    let j; try { j = JSON.parse(t); } catch (e) { j = { ok: r.ok, message: t }; }
+    if (j.ok === undefined) j.ok = r.ok;
+    return j;
+  } catch (e) {
+    return { ok: false, message: 'Board Remote is not running. Double click START.bat.' };
+  }
+}
+function toast(msg, err, command) {
+  if (!msg) return;
+  const el = document.createElement('div');
+  el.className = 'toast' + (err ? ' err' : '');
+  el.textContent = msg;
+  if (command) { el.appendChild(document.createTextNode('\n')); const c = document.createElement('code'); c.textContent = command; el.appendChild(c); }
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), err || command ? 9000 : 4000);
+}
+const report = j => { toast(j.message, !j.ok, j.command); return j; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } }
+};
+function ago(ts) {
+  if (!ts) return '';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  if (s < 86400) return Math.round(s / 3600) + ' hr ago';
+  return Math.round(s / 86400) + ' days ago';
+}
+
+/* ---------- status vocabulary ---------- */
+function look(b) {
+  switch (b.status) {
+    case 'online': return { cls: 'ok', pill: 'Connected', title: 'Connected', text: 'Waiting for the first screen…' };
+    case 'unauthorized': return { cls: 'warn', pill: 'Approve on board', title: 'Approve on the board', text: 'Tap Allow on the board and tick Always allow from this computer. This happens once per board.' };
+    case 'offline': return { cls: 'warn', pill: 'Not responding', title: 'Not responding', text: 'ADB can see the board but it is not answering. Reconnecting on its own.' };
+    case 'unreachable': return { cls: 'bad', pill: 'Not reachable', title: 'Not reachable', text: b.error || 'The board did not answer on the network.' };
+    case 'disconnected': return b.paused
+      ? { cls: 'idle', pill: 'Disconnected', title: 'Disconnected', text: 'You disconnected this board. Click Connect to bring it back.' }
+      : { cls: 'idle', pill: 'Not connected', title: 'Not connected', text: b.auto ? 'Connecting…' : 'Auto reconnect is off for this board. Click Connect.' };
+    case 'connecting': case 'starting': return { cls: 'info', pill: 'Connecting', title: 'Connecting', text: 'Reaching ' + b.serial + '…' };
+    default: return { cls: 'idle', pill: b.status, title: b.status, text: b.error || '' };
+  }
+}
+
+/* ---------- state ---------- */
+let S = null;
+const boards = new Map();
+const cards = new Map();
+let screensMode = store.get('br.screens', 'normal');
+let focusId = null, focusToken = 0;
+
+async function poll() {
+  const j = await api('/api/state');
+  if (j && j.boards) { S = j; render(); }
+  else $('#footInfo').textContent = 'Board Remote is not running. Double click START.bat.';
+}
+
+/* ---------- cards ---------- */
+function makeCard(b) {
+  const el = document.createElement('article');
+  el.className = 'card';
+  el.innerHTML =
+    '<div class="head"><span class="dot"></span><div style="min-width:0"><div class="name"></div><div class="sub"></div></div>' +
+    '<span class="pill"></span><button class="icon-btn more" title="More">' + IC.more + '</button></div>' +
+    '<div class="screen" title="Open this board"><img alt=""><span class="badge">' + IC.moon + 'Screen asleep</span>' +
+    '<div class="veil"><div class="veil-title"></div><div class="veil-text"></div></div>' +
+    '<span class="zoom">' + IC.expand + 'Open</span><div class="drop">Drop APK to install</div></div>' +
+    '<div class="meta"><button class="addr" title="Copy the adb shell command"></button><span class="app"></span></div>' +
+    '<div class="row"><button class="btn connect"></button><button class="btn mirror" title="Live mirror">' + IC.monitor + '<span>Mirror</span></button><button class="btn shell" title="Shell window">' + IC.term + '<span>Shell</span></button></div>';
+  const c = { id: b.id, el, img: el.querySelector('img'), dead: false, url: null };
+  el.querySelector('.screen').onclick = e => { if (e.target.closest('.badge')) { key(c.id, 'wake'); return; } openFocus(c.id); };
+  el.querySelector('.badge').title = 'Click to wake the screen';
+  el.querySelector('.more').onclick = e => { e.stopPropagation(); openMenu(c.id, e.currentTarget); };
+  el.querySelector('.addr').onclick = () => copyCmd(c.id);
+  el.querySelector('.connect').onclick = () => toggleConnect(c.id);
+  el.querySelector('.mirror').onclick = () => doMirror(c.id);
+  el.querySelector('.shell').onclick = () => doShell(c.id);
+  // drag an APK onto a card to install it
+  el.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); el.classList.add('dropping'); } });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('dropping'); });
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('dropping'); const f = e.dataTransfer.files[0]; if (f) installApk(c.id, f); });
+  el._card = c; inView.observe(el);
+  return c;
+}
+function updateCard(c, b) {
+  const L = look(b);
+  const el = c.el;
+  el.className = 'card ' + L.cls + (el.classList.contains('has-shot') ? ' has-shot' : ' no-shot') + (b.status === 'online' && b.awake === false ? ' asleep' : '') + (el.classList.contains('dropping') ? ' dropping' : '');
+  // a board named by the room list shows "Room 401" with its type on the line below, so names never cut off
+  const auto = b.room && b.name.toLowerCase() === roomName(b.room).toLowerCase() + ' ' + (KIND_NAME[b.kind] || '').toLowerCase();
+  el.querySelector('.name').textContent = auto ? roomName(b.room) : b.name;
+  el.querySelector('.name').title = b.name;
+  const dev = [b.make && b.model && b.model.toLowerCase().indexOf(b.make.toLowerCase()) !== 0 ? b.make + ' ' + b.model : b.model, b.android ? 'Android ' + b.android : ''].filter(Boolean).join('  ·  ');
+  el.querySelector('.sub').textContent = [auto ? KIND_NAME[b.kind] : '', dev || (b.lastSeen ? 'Last seen ' + ago(b.lastSeen) : 'Not seen yet')].filter(Boolean).join('  ·  ');
+  el.querySelector('.pill').textContent = L.pill;
+  el.querySelector('.veil-title').textContent = b.status === 'online' ? '' : L.title;
+  el.querySelector('.veil-text').textContent = b.status === 'online' ? (screensMode === 'off' ? 'Screens are off. Click to open.' : L.text) : L.text;
+  el.querySelector('.addr').innerHTML = '';
+  el.querySelector('.addr').append(b.serial);
+  el.querySelector('.addr').insertAdjacentHTML('beforeend', IC.copy);
+  const app = el.querySelector('.app');
+  app.textContent = b.status === 'online' && b.app ? b.app : '';
+  app.title = b.app || '';
+  const cb = el.querySelector('.connect');
+  const on = b.status === 'online' || b.status === 'unauthorized' || b.status === 'offline';
+  cb.innerHTML = (on ? IC.unplug + '<span>Disconnect</span>' : IC.plug + '<span>Connect</span>');
+  cb.title = on ? 'Disconnect' : 'Connect';
+  cb.className = 'btn connect' + (on ? '' : ' green');
+  el.querySelector('.mirror').disabled = b.status !== 'online';
+  el.querySelector('.shell').disabled = b.status !== 'online';
+  if (b.status !== 'online' && el.classList.contains('has-shot')) { el.classList.remove('has-shot'); el.classList.add('no-shot'); }
+}
+
+/* boards with a room sort by unit, room, then type, so the page reads like the floor */
+const KIND_ORDER = ['wb', 'ds', 'tv', 'cam', 'tab', 'usb', 'other'];
+const KIND_NAME = { wb: 'Whiteboard', ds: 'Door sign', tv: 'Patient TV', cam: 'Camera', tab: 'Tablet', usb: 'Unit Status Board', other: 'Device' };
+const KIND_PLURAL = { wb: 'Whiteboards', ds: 'Door signs', tv: 'Patient TVs', cam: 'Cameras', tab: 'Tablets', usb: 'Unit Status Boards', other: 'Type not set' };
+const roomName = r => /^\d/.test(r) ? 'Room ' + r : r;
+function byRoom(a, b) {
+  return (a.room ? 0 : 1) - (b.room ? 0 : 1) || String(a.unit || '').localeCompare(String(b.unit || ''), undefined, { numeric: true }) ||
+    String(a.room || '').localeCompare(String(b.room || ''), undefined, { numeric: true }) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind);
+}
+function render() {
+  const grid = $('#grid');
+  const all = S.boards.slice().sort(byRoom);
+  const ids = new Set(all.map(b => b.id));
+  boards.clear(); all.forEach(b => boards.set(b.id, b));
+  for (const [id, c] of cards) if (!ids.has(id)) { c.dead = true; inView.unobserve(c.el); c.el.remove(); if (c.url) URL.revokeObjectURL(c.url); cards.delete(id); }
+  const filtering = renderFilters(all);
+  const list = filtering ? all.filter(matches) : all;
+  const shown = new Set(list.map(b => b.id));
+  for (const [id, c] of cards) if (!shown.has(id) && c.shown) { c.shown = false; c.inView = false; c.el.remove(); }
+
+  if (!all.length) {
+    grid.classList.add('is-empty');
+    if (!grid.querySelector('.empty')) grid.innerHTML = emptyHtml();
+    grid.style.removeProperty('--cols');
+    wireEmpty();
+  } else {
+    const e = grid.querySelector('.empty'); if (e) e.remove();
+    grid.classList.remove('is-empty');
+    let nm = grid.querySelector('.nomatch');
+    if (!list.length && !nm) {
+      nm = document.createElement('div'); nm.className = 'nomatch';
+      nm.innerHTML = '<b>No boards match.</b><button class="btn" type="button">Show all boards</button>';
+      nm.querySelector('button').onclick = () => setFilter('all', '');
+      grid.append(nm);
+    } else if (list.length && nm) nm.remove();
+    list.forEach((b, i) => {
+      let c = cards.get(b.id);
+      if (!c) { c = makeCard(b); cards.set(b.id, c); }
+      c.shown = true;
+      updateCard(c, b);
+      if (grid.children[i] !== c.el) grid.insertBefore(c.el, grid.children[i] || null);
+    });
+  }
+  layout();
+  renderSummary();
+  renderFoot();
+  if (focusId) renderFocusInfo();
+}
+
+/* ---------- show: unit, type, problems, or a room or IP typed in ---------- */
+let showSel = store.get('br.show', 'all'), query = '';
+const FILTER_FROM = 12;   // the filter appears once a site has this many boards
+function matches(b) {
+  if (showSel === 'bad' && look(b).cls === 'ok') return false;
+  if (showSel.indexOf('u:') === 0 && (b.unit || '') !== showSel.slice(2)) return false;
+  if (showSel.indexOf('k:') === 0 && (b.kind || 'other') !== showSel.slice(2)) return false;
+  if (query) {
+    const q = query.toLowerCase();
+    if (![b.name, b.room, b.host, b.serial, b.unit].some(v => String(v || '').toLowerCase().indexOf(q) >= 0)) return false;
+  }
+  return true;
+}
+function renderFilters(all) {
+  const on = all.length >= FILTER_FROM;
+  $('#filters').hidden = !on;
+  document.body.classList.toggle('many', on);
+  if (!on) return false;
+  const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+  const units = new Map(), kinds = new Map();
+  let bad = 0;
+  all.forEach(b => {
+    if (b.unit) units.set(b.unit, (units.get(b.unit) || 0) + 1);
+    const k = b.kind || 'other'; kinds.set(k, (kinds.get(k) || 0) + 1);
+    if (look(b).cls !== 'ok') bad++;
+  });
+  const opt = (v, t) => '<option value="' + esc(v) + '">' + esc(t) + '</option>';
+  let html = opt('all', 'All boards (' + all.length + ')') + opt('bad', 'Needs a look (' + bad + ')');
+  if (units.size > 1) html += '<optgroup label="Unit">' + [...units.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(u => opt('u:' + u, u + ' (' + units.get(u) + ')')).join('') + '</optgroup>';
+  if (kinds.size > 1) html += '<optgroup label="Type">' + KIND_ORDER.filter(k => kinds.has(k)).map(k => opt('k:' + k, (KIND_PLURAL[k] || KIND_NAME[k]) + ' (' + kinds.get(k) + ')')).join('') + '</optgroup>';
+  const sel = $('#show');
+  if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
+  if (![...sel.options].some(o => o.value === showSel)) showSel = 'all';
+  sel.value = showSel;
+  $('#filters').classList.toggle('on', showSel !== 'all' || !!query);
+  return showSel !== 'all' || !!query;
+}
+function setFilter(v, q) {
+  showSel = v; store.set('br.show', v);
+  if (q !== undefined) { query = q; $('#q').value = q; }
+  if (S) render();
+  $('#main').scrollTop = 0;
+  wallKick();
+}
+$('#show').onchange = e => setFilter(e.target.value);
+$('#q').oninput = e => { query = e.target.value.trim(); if (S) render(); $('#main').scrollTop = 0; wallKick(); };
+$('#q').onkeydown = e => { if (e.key === 'Escape') setFilter(showSel, ''); };
+
+function emptyHtml() {
+  return '<section class="empty"><div><div class="label">Get started</div><h2>Add your first board</h2>' +
+    '<p>Each board needs ADB over the network turned on (port 5555). Pick whichever way is easiest.</p></div>' +
+    '<div class="ways">' +
+    '<div class="way"><h3>Find boards</h3><p class="muted">Looks across this network for anything with ADB open and lets you add it with one click.</p><button class="btn dark" data-empty="scan">Find boards</button></div>' +
+    '<div class="way"><h3>USB to WiFi</h3><p class="muted">Plug a board into this PC once with a USB cable. This switches it to network ADB and adds it.</p><button class="btn" data-empty="usb">USB to WiFi</button></div>' +
+    '<div class="way"><h3>Import a room list</h3><p class="muted">Paste rooms and IP addresses from a spreadsheet. Every board is added and named by its room.</p><a class="btn dark" href="/deploy#import" style="text-decoration:none">Import rooms</a></div>' +
+    '<div class="way"><h3>Add by IP</h3><p class="muted">Already know the address? Type it in and give the board a name.</p><button class="btn" data-empty="add">Add board</button></div>' +
+    '</div></section>';
+}
+function wireEmpty() {
+  document.querySelectorAll('[data-empty]').forEach(b => {
+    b.onclick = () => ({ scan: openScan, usb: usbWifi, add: () => openBoardDialog() })[b.dataset.empty]();
+  });
+}
+
+/* fit every card on screen without scrolling */
+let fixedH = 196;
+function layout() {
+  const grid = $('#grid'), main = $('#main');
+  const on = [...cards.values()].filter(c => c.shown);
+  const n = on.length;
+  if (!n) return;
+  const first = on[0].el;
+  const scr = first.querySelector('.screen');
+  if (first.offsetHeight && scr.offsetHeight) fixedH = first.offsetHeight - scr.offsetHeight;
+  const W = main.clientWidth, H = main.clientHeight, g = 16, pad = 24, maxW = 760, minW = 220;
+  let best = { c: 1, w: 0 };
+  for (let c = 1; c <= n; c++) {
+    const colW = (W - g * (c - 1)) / c;
+    if (colW < minW && c > 1) break;
+    const rows = Math.ceil(n / c);
+    const rowH = (H - g * (rows - 1)) / rows;
+    const wByH = (rowH - fixedH) * 16 / 9 + pad;
+    const w = Math.min(colW, wByH, maxW);
+    if (w > best.w) best = { c, w };
+  }
+  let w = Math.floor(best.w), c = best.c;
+  if (w < minW) { c = Math.max(1, Math.floor((W + g) / (minW + g))); w = Math.floor((W - g * (c - 1)) / c); }
+  grid.style.setProperty('--cols', c);
+  grid.style.setProperty('--cardw', w + 'px');
+}
+window.addEventListener('resize', layout);
+
+function renderSummary() {
+  const n = { ok: 0, warn: 0, bad: 0, idle: 0, info: 0 };
+  S.boards.forEach(b => { n[look(b).cls]++; });
+  const parts = [];
+  if (S.boards.length) {
+    parts.push('<span class="chip ok"><span class="d"></span><b>' + n.ok + '</b> of ' + S.boards.length + ' connected</span>');
+    if (n.info) parts.push('<span class="chip"><span class="d" style="background:var(--blue)"></span><b>' + n.info + '</b> connecting</span>');
+    if (n.warn) parts.push('<span class="chip warn"><span class="d"></span><b>' + n.warn + '</b> need attention</span>');
+    if (n.bad) parts.push('<span class="chip bad"><span class="d"></span><b>' + n.bad + '</b> not reachable</span>');
+    if (n.idle) parts.push('<span class="chip idle"><span class="d"></span><b>' + n.idle + '</b> disconnected</span>');
+  }
+  const u = (S.usb || []).length;
+  if (u) parts.push('<span class="chip usb" id="chipUsb"><b>' + u + '</b> on USB · switch to WiFi</span>');
+  $('#summary').innerHTML = parts.join('');
+  const cu = $('#chipUsb'); if (cu) cu.onclick = usbWifi;
+}
+function renderFoot() {
+  const a = S.adb.path ? 'adb ready' : 'adb missing, run SETUP.bat';
+  const m = S.scrcpy.path ? 'mirror ready' : 'mirror missing, run SETUP.bat';
+  let shots = '';
+  if (WALL[screensMode]) {
+    let v = 0; cards.forEach(c => { if (c.inView && c.shown && (boards.get(c.id) || {}).status === 'online') v++; });
+    if (v) shots = '   ·   ' + v + ' screens in view, each every ' + Math.round(wallEvery(v) / 100) / 10 + ' s';
+  }
+  $('#footInfo').textContent = (S.boards.length ? (n => 'Keeping ' + n + (n === 1 ? ' board' : ' boards') + ' connected, checking every ' + S.keepaliveSeconds + ' seconds')(S.boards.filter(b => b.auto).length) : 'No boards yet') + '   ·   ' + a + '   ·   ' + m + shots;
+  $('#footInfo').title = 'adb: ' + (S.adb.path || 'not found') + '\nscrcpy: ' + (S.scrcpy.path || 'not found');
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.v === screensMode));
+}
+document.querySelectorAll('#seg button').forEach(b => b.onclick = () => {
+  screensMode = b.dataset.v; store.set('br.screens', screensMode); renderFoot();
+  cards.forEach(c => { if (screensMode === 'off') { c.el.classList.remove('has-shot'); c.el.classList.add('no-shot'); } c.shotAt = 0; });
+  wallKick();
+});
+
+/* ---------- live thumbnails ---------- */
+async function loadFrame(id, fresh) {
+  const r = await fetch('/api/boards/' + id + '/screen' + (fresh ? '?fresh=1' : ''), { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const im = new Image(); im.src = url;
+  try { await im.decode(); } catch (e) { URL.revokeObjectURL(url); throw e; }
+  return { url, w: im.naturalWidth, h: im.naturalHeight };
+}
+function setThumb(c, url) {
+  if (c.url) URL.revokeObjectURL(c.url);
+  c.url = url; c.img.src = url;
+  c.el.classList.add('has-shot'); c.el.classList.remove('no-shot');
+}
+/* A card keeps a small copy of the screen (card size), not the full 1920 wide picture, so 150 cards stay light in the browser. */
+async function loadThumb(id, width) {
+  const r = await fetch('/api/boards/' + id + '/screen', { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  const blob = await r.blob();
+  const w = Math.max(240, Math.min(960, Math.round(width * (window.devicePixelRatio || 1))));
+  try {
+    const bmp = await createImageBitmap(blob, { resizeWidth: w, resizeQuality: 'medium' });
+    const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height;
+    cv.getContext('2d').drawImage(bmp, 0, 0); bmp.close();
+    const small = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.86));
+    if (small) return URL.createObjectURL(small);
+  } catch (e) { /* older browser: use the full picture */ }
+  return URL.createObjectURL(blob);
+}
+/* Screens on the wall. Only cards in view refresh, and the page shares one budget, so 150 boards cost the boards and
+   the network no more than 20 do. Normal: each card at least every 4 s, at most 3 captures a second for the page.
+   Live: each card at least every 1.2 s, at most 8 a second. Scroll or filter to a unit and those screens refresh faster. */
+const WALL = { normal: { every: 4000, perSec: 3, par: 3 }, live: { every: 1200, perSec: 8, par: 6 } };
+let wallBusy = 0, wallTimer = null;
+const inView = new IntersectionObserver(es => {
+  let any = false;
+  es.forEach(e => { const c = e.target._card; if (c) { c.inView = e.isIntersecting; any = any || e.isIntersecting; } });
+  if (any) wallKick();
+}, { root: $('#main'), rootMargin: '120px 0px' });
+function wallKick() { clearTimeout(wallTimer); wallTimer = setTimeout(wallTick, 40); }
+function wallEvery(n) { const w = WALL[screensMode]; return w ? Math.max(w.every, n / w.perSec * 1000) : 0; }
+function wallTick() {
+  clearTimeout(wallTimer); wallTimer = setTimeout(wallTick, 250);
+  const w = WALL[screensMode];
+  if (!w || document.hidden || focusId) return;
+  const vis = [];
+  cards.forEach(c => { if (c.inView && c.shown && !c.dead && (boards.get(c.id) || {}).status === 'online') vis.push(c); });
+  if (!vis.length) return;
+  const every = wallEvery(vis.length), t = Date.now();
+  vis.sort((a, b) => (a.shotAt || 0) - (b.shotAt || 0));
+  for (const c of vis) {
+    if (wallBusy >= w.par) break;
+    if (c.loading) continue;
+    if (t - (c.shotAt || 0) < every) break;
+    pullThumb(c);
+  }
+}
+async function pullThumb(c) {
+  c.loading = true; c.shotAt = Date.now(); wallBusy++;
+  try { const url = await loadThumb(c.id, c.img.parentNode.clientWidth || 360); if (!c.dead && WALL[screensMode]) setThumb(c, url); else URL.revokeObjectURL(url); }
+  catch (e) { /* board busy or just dropped */ }
+  finally { c.loading = false; wallBusy--; }
+}
+wallTick();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wallKick(); });
+
+/* ---------- actions ---------- */
+async function toggleConnect(id) {
+  const b = boards.get(id); if (!b) return;
+  const on = b.status === 'online' || b.status === 'unauthorized' || b.status === 'offline';
+  const c = cards.get(id); c.el.querySelector('.connect').disabled = true;
+  report(await api('/api/boards/' + id + (on ? '/disconnect' : '/connect'), {}));
+  poll();
+}
+async function doMirror(id) { toast('Opening live mirror…'); report(await api('/api/boards/' + id + '/mirror', {})); }
+async function doShell(id) { report(await api('/api/boards/' + id + '/shell', {})); }
+async function key(id, k) { await api('/api/boards/' + id + '/key', { key: k }); }
+async function restartApp(id) { toast('Restarting the app…'); report(await api('/api/boards/' + id + '/restartapp', {})); }
+async function reboot(id) {
+  const b = boards.get(id);
+  if (!confirm('Reboot ' + b.name + '? It drops off for a minute and reconnects on its own.')) return;
+  report(await api('/api/boards/' + id + '/reboot', {}));
+  if (focusId === id) closeFocus();
+  poll();
+}
+function copyCmd(id) {
+  const b = boards.get(id);
+  const cmd = 'adb -s ' + b.serial + ' shell';
+  (navigator.clipboard ? navigator.clipboard.writeText(cmd) : Promise.reject()).then(() => toast('Copied: ' + cmd), () => toast('Copy this command:', false, cmd));
+}
+async function installApk(id, file) {
+  const b = boards.get(id);
+  if (!/\.apk$/i.test(file.name)) return toast('Drop an .apk file to install it.', true);
+  if (!b || b.status !== 'online') return toast(b ? b.name + ' is not connected.' : 'Unknown board', true);
+  toast('Installing ' + file.name + ' on ' + b.name + '…');
+  report(await api('/api/boards/' + id + '/install', undefined, { raw: file }));
+}
+async function usbWifi() {
+  toast('Looking for boards on USB…');
+  report(await api('/api/usbwifi', {}));
+  poll();
+}
+$('#btnUsb').onclick = usbWifi;
+$('#btnAll').onclick = async () => { toast('Connecting every board…'); report(await api('/api/connectall', {})); poll(); };
+$('#btnAdd').onclick = () => openBoardDialog();
+$('#btnScan').onclick = () => openScan();
+/* ---------- snapshots ---------- */
+function openSnap() {
+  const c = (S && S.snapshots) || {};
+  $('#snapDirIn').value = c.dir || '';
+  $('#snapEvery').value = c.everyMinutes || 0;
+  $('#snapKeep').value = c.keepDays || 14;
+  $('#dlgSnap').showModal();
+  loadSnaps();
+}
+async function loadSnaps() {
+  const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const grid = $('#snapGrid');
+  grid.innerHTML = '<div class="hint">Loading…</div>';
+  const j = await api('/api/snaps?limit=200');
+  if (!j.ok) { grid.innerHTML = '<div class="hint">' + e(j.message || 'Could not read the folder.') + '</div>'; return; }
+  if (j.dir) $('#snapDirIn').placeholder = j.dir;
+  if (!j.items.length) { grid.innerHTML = '<div class="hint">No snapshots yet. Capture all connected, or set an interval above.</div>'; return; }
+  grid.innerHTML = j.items.map(it => {
+    const u = '/api/snap/file?p=' + encodeURIComponent(it.rel);
+    const cap = e((it.name || '').replace(/\.png$/, '').replace(/_/g, ' '));
+    const when = e(it.day + ' ' + new Date(it.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+    return '<a href="' + u + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><img loading="lazy" src="' + u + '" alt="' + cap + '" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:8px;background:#000;box-shadow:inset 0 0 0 1px var(--line)"><div style="font-size:11px;margin-top:3px;line-height:1.3">' + cap + '<br><span class="hint">' + when + '</span></div></a>';
+  }).join('');
+}
+$('#btnSnap').onclick = openSnap;
+$('#snapClose').onclick = () => $('#dlgSnap').close();
+$('#snapRefresh').onclick = loadSnaps;
+$('#snapAll').onclick = async () => {
+  const ids = (S ? S.boards.filter(b => b.status === 'online') : []).map(b => b.id);
+  if (!ids.length) { toast('No connected boards to capture.', true); return; }
+  toast('Capturing ' + ids.length + (ids.length === 1 ? ' board…' : ' boards…'));
+  report(await api('/api/snap', { ids }));
+  loadSnaps();
+};
+$('#snapSave').onclick = async () => {
+  const j = await api('/api/snap/settings', { dir: $('#snapDirIn').value, everyMinutes: Number($('#snapEvery').value) || 0, keepDays: Number($('#snapKeep').value) || 14 });
+  report(j);
+  if (j.ok) { if (S) S.snapshots = j.settings; $('#snapDirIn').value = ''; $('#snapDirIn').placeholder = j.dir; }
+};
+$('#snapOpen').onclick = async () => report(await api('/api/snap/open', {}));
+$('#btnStop').onclick = async () => {
+  if (!confirm('Stop Board Remote? Boards stay connected to adb, but nothing will reconnect them until you run START.bat again.')) return;
+  await api('/api/quit', {});
+  $('#footInfo').textContent = 'Board Remote stopped. Double click START.bat to start it again.';
+  clearInterval(pollTimer);
+};
+
+/* ---------- menu ---------- */
+let menuEl = null;
+function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+function openMenu(id, anchor) {
+  closeMenu();
+  const b = boards.get(id);
+  const online = b.status === 'online';
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  const items = [
+    ['edit', IC.edit, 'Rename or change address', () => openBoardDialog(id)],
+    ['copy', IC.copy, 'Copy adb command', () => copyCmd(id)],
+    null,
+    ['restart', IC.restart, 'Restart the app on screen', () => restartApp(id), !online],
+    ['reboot', IC.power, 'Reboot board', () => reboot(id), !online],
+    null,
+    ['remove', IC.trash, 'Remove from list', () => removeBoard(id), false, 'danger']
+  ];
+  items.forEach(it => {
+    if (!it) { menuEl.appendChild(document.createElement('hr')); return; }
+    const btn = document.createElement('button');
+    btn.innerHTML = it[1]; btn.append(it[2]);
+    if (it[5]) btn.className = it[5];
+    if (it[4]) btn.disabled = true, btn.style.opacity = .4;
+    btn.onclick = () => { closeMenu(); it[3](); };
+    menuEl.appendChild(btn);
+  });
+  document.body.appendChild(menuEl);
+  const r = anchor.getBoundingClientRect();
+  const mw = menuEl.offsetWidth, mh = menuEl.offsetHeight;
+  menuEl.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw)) + 'px';
+  menuEl.style.top = (r.bottom + 6 + mh > window.innerHeight ? r.top - mh - 6 : r.bottom + 6) + 'px';
+}
+document.addEventListener('click', e => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); });
+
+/* ---------- add / edit ---------- */
+let editing = null;
+function openBoardDialog(id) {
+  editing = id || null;
+  const b = id ? boards.get(id) : null;
+  $('#dlgTitle').textContent = b ? 'Edit board' : 'Add board';
+  $('#fName').value = b ? b.name : '';
+  $('#fHost').value = b ? b.host : '';
+  $('#fPort').value = b ? b.port : 5555;
+  $('#fAuto').checked = b ? b.auto : true;
+  // "Not set" is only offered for a board that has no type yet, so it is never picked by accident
+  const ns = $('#fKind').querySelector('option[value="other"]');
+  if (b && (b.kind || 'other') === 'other') { if (!ns) $('#fKind').insertAdjacentHTML('beforeend', '<option value="other">Not set</option>'); }
+  else if (ns) ns.remove();
+  $('#fKind').value = b ? (b.kind || 'other') : 'wb';
+  $('#fRoom').value = b ? b.room || '' : ''; $('#fUnit').value = b ? b.unit || '' : ''; $('#fCloset').value = b ? b.closet || '' : ''; $('#fApp').value = b ? b.appPkg || '' : '';
+  $('#dlgRemove').hidden = !b;
+  $('#formErr').textContent = '';
+  $('#dlgBoard').showModal();
+  (b ? $('#fName') : $('#fHost')).focus();
+}
+$('#dlgCancel').onclick = () => $('#dlgBoard').close();
+$('#dlgRemove').onclick = () => { const id = editing; $('#dlgBoard').close(); removeBoard(id); };
+$('#formBoard').onsubmit = async e => {
+  e.preventDefault();
+  const body = { name: $('#fName').value.trim(), host: $('#fHost').value.trim(), port: Number($('#fPort').value) || 5555, auto: $('#fAuto').checked,
+    kind: $('#fKind').value, room: $('#fRoom').value.trim(), unit: $('#fUnit').value.trim(), closet: $('#fCloset').value.trim(), app: $('#fApp').value.trim() };
+  if (!body.name) body.name = body.host;
+  const j = await api(editing ? '/api/boards/' + editing + '/edit' : '/api/boards', body);
+  if (!j.ok) { $('#formErr').textContent = j.message; return; }
+  $('#dlgBoard').close();
+  toast(j.message);
+  poll();
+};
+async function removeBoard(id) {
+  const b = boards.get(id);
+  if (!confirm('Remove ' + b.name + ' from Board Remote? You can add it again later.')) return;
+  report(await api('/api/boards/' + id + '/remove', {}));
+  poll();
+}
+
+/* ---------- scan ---------- */
+let lastFound = [];
+async function openScan() {
+  if (!$('#dlgScan').open) $('#dlgScan').showModal();
+  $('#scanAddAll').hidden = true;
+  $('#scanBody').innerHTML = '<p class="muted">Checking every address on this network for ADB on port 5555. This takes a few seconds.</p><div class="spin"></div>';
+  const j = await api('/api/scan', { port: 5555 });
+  if (!j.ok) { $('#scanBody').innerHTML = ''; $('#scanBody').append(j.message || 'Scan failed.'); return; }
+  lastFound = j.found;
+  const fresh = j.found.filter(f => !f.known);
+  const box = document.createElement('div');
+  const p = document.createElement('p');
+  p.className = 'muted';
+  p.textContent = j.found.length
+    ? 'Found ' + j.found.length + ' device' + (j.found.length === 1 ? '' : 's') + ' with ADB open (' + j.scanned + ' addresses checked). Rename them after adding.'
+    : 'Nothing answered on port 5555 (' + j.scanned + ' addresses checked). Make sure network ADB is on, or use USB to WiFi.';
+  box.appendChild(p);
+  const list = document.createElement('div'); list.className = 'found';
+  j.found.forEach(f => {
+    const row = document.createElement('div'); row.className = 'fr';
+    const left = document.createElement('div');
+    const ip = document.createElement('div'); ip.className = 'ip'; ip.textContent = f.host;
+    const k = document.createElement('div'); k.className = 'k'; k.textContent = f.known ? 'Already added as ' + f.name : 'New';
+    left.append(ip, k); row.appendChild(left);
+    if (!f.known) {
+      const add = document.createElement('button'); add.className = 'btn dark'; add.textContent = 'Add';
+      add.onclick = async () => { add.disabled = true; const r = await api('/api/boards', { name: 'Board ' + f.host.split('.').pop(), host: f.host, port: f.port }); report(r); if (r.ok) { f.known = true; k.textContent = 'Added'; add.remove(); } else add.disabled = false; poll(); };
+      row.appendChild(add);
+    }
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+  $('#scanBody').innerHTML = ''; $('#scanBody').appendChild(box);
+  $('#scanAddAll').hidden = fresh.length < 2;
+}
+$('#scanAgain').onclick = openScan;
+$('#scanClose').onclick = () => $('#dlgScan').close();
+$('#scanAddAll').onclick = async () => {
+  for (const f of lastFound.filter(x => !x.known)) await api('/api/boards', { name: 'Board ' + f.host.split('.').pop(), host: f.host, port: f.port });
+  $('#dlgScan').close(); toast('Added. Click a name to rename it.'); poll();
+};
+
+/* ---------- focus view ---------- */
+// The big view streams the board's own H.264 video (decoded by the browser) and sends
+// touches straight through scrcpy's control channel. If that is not possible it falls
+// back to snapshots and adb input, which work everywhere but are slower.
+const fimg = $('#fimg'), fcan = $('#fcanvas'), fctx = fcan.getContext('2d');
+let natural = { w: 0, h: 0 }, furl = null, lv = null;
+
+function openFocus(id) {
+  const b = boards.get(id);
+  if (!b) return;
+  if (b.status !== 'online') { toast(b.name + ': ' + look(b).title + '. ' + look(b).text, true); return; }
+  stopLiveView();
+  focusId = id; focusToken++;
+  const token = focusToken;
+  $('#focus').hidden = false;
+  $('#fwait').textContent = 'Loading screen…';
+  $('#fwait').style.display = '';
+  $('#fstat').textContent = '';
+  fimg.style.display = ''; fcan.style.display = 'none';
+  fimg.style.visibility = 'hidden';
+  const c = cards.get(id);
+  if (c && c.url) { fimg.src = c.url; fimg.style.visibility = 'visible'; $('#fwait').style.display = 'none'; }
+  renderFocusInfo();
+  setMode('wait');
+  focusLoop(id, token);                       // snapshots until live video shows its first frame
+  startLive(id, token);
+}
+function closeFocus() {
+  stopLiveView();
+  focusId = null; focusToken++;
+  $('#focus').hidden = true;
+  wallKick();
+}
+function renderFocusInfo() {
+  const b = boards.get(focusId);
+  if (!b) return closeFocus();
+  $('#fname').textContent = b.name;
+  $('#fsub').textContent = [b.serial, b.model, b.android ? 'Android ' + b.android : ''].filter(Boolean).join('  ·  ');
+}
+function setMode(m, why) {
+  const el = $('#fmode');
+  el.className = 'fmode' + (m === 'live' ? ' live' : m === 'wait' ? ' wait' : '');
+  el.innerHTML = '<span class="d"></span>';
+  el.append(m === 'live' ? 'Live video' : m === 'wait' ? 'Starting live video' : 'Snapshots');
+  el.title = why || '';
+  if (m === 'snap' && why) $('#fstat').textContent = why;
+}
+
+/* live video */
+async function startLive(id, token) {
+  if (!S || !S.scrcpy || !S.scrcpy.live) { setMode('snap', 'Live video needs scrcpy. Run SETUP.bat once.'); return false; }
+  if (!('VideoDecoder' in window)) { setMode('snap', 'This browser cannot decode live video. Use Edge or Chrome.'); return false; }
+  const st = lv = { id, token, ctl: new AbortController(), dec: null, codecName: 'h264', codec: '', cfg: null, key: false, shown: false, dead: false, n: 0, t0: performance.now() };
+  let r;
+  try { r = await fetch('/api/boards/' + id + '/stream', { signal: st.ctl.signal, cache: 'no-store' }); }
+  catch (e) { if (lv === st) lv = null; return st.dead; }
+  if (st.dead) { try { st.ctl.abort(); } catch (e) { /* closed */ } return true; }
+  if (!r.ok || !r.body) {
+    let msg = '';
+    try { msg = (await r.json()).message; } catch (e) { /* not json */ }
+    if (lv === st) lv = null;
+    setMode('snap', msg || 'Live video is not available for this board.');
+    if (focusId === id && focusToken === token) focusLoop(id, token);
+    return false;
+  }
+  readStream(st, r.body.getReader());
+  return true;
+}
+function joinBytes(a, b) { const c = new Uint8Array(a.length + b.length); c.set(a); c.set(b, a.length); return c; }
+async function readStream(st, reader) {
+  let buf = new Uint8Array(0);
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done || st.dead) break;
+      buf = buf.length ? joinBytes(buf, value) : value;
+      let off = 0;
+      while (buf.length - off >= 13) {
+        const dv = new DataView(buf.buffer, buf.byteOffset + off, 13);
+        const kind = dv.getUint8(0), len = dv.getUint32(1), pts = dv.getUint32(5) * 4294967296 + dv.getUint32(9);
+        if (buf.length - off < 13 + len) break;
+        onPacket(st, kind, pts, buf.subarray(off + 13, off + 13 + len));
+        off += 13 + len;
+      }
+      if (off) buf = buf.slice(off);
+    }
+  } catch (e) { /* aborted or dropped */ }
+  if (!st.dead) liveFailed(st, 'Live video stopped, showing snapshots.');
+}
+function codecString(name, cfg) {
+  if (name === 'vp8') return 'vp8';
+  if (name === 'vp9') return 'vp09.00.10.08';
+  if (name === 'av1') return 'av01.0.08M.08';
+  if (name === 'h265') return 'hev1.1.6.L120.90';
+  if (cfg) {
+    for (let i = 0; i + 6 < cfg.length; i++) {       // SPS gives profile, constraints and level
+      if (cfg[i] === 0 && cfg[i + 1] === 0 && cfg[i + 2] === 1 && (cfg[i + 3] & 0x1f) === 7) {
+        const hx = v => v.toString(16).padStart(2, '0');
+        return 'avc1.' + hx(cfg[i + 4]) + hx(cfg[i + 5]) + hx(cfg[i + 6]);
+      }
+    }
+  }
+  return 'avc1.42e01f';
+}
+function configure(st, codec) {
+  if (!st.dec) st.dec = new VideoDecoder({ output: f => drawFrame(st, f), error: e => liveFailed(st, 'Video decoder: ' + e.message) });
+  st.codec = codec;
+  st.dec.configure({ codec, optimizeForLatency: true });
+}
+function onPacket(st, kind, pts, data) {
+  if (st.dead) return;
+  if (kind === 1) {
+    try { const m = JSON.parse(new TextDecoder().decode(data)); st.codecName = m.codec || 'h264'; } catch (e) { /* ignore */ }
+    return;
+  }
+  const annexB = st.codecName === 'h264' || st.codecName === 'h265';
+  if (kind === 2) { st.cfg = data.slice(); configure(st, codecString(st.codecName, st.cfg)); st.key = false; return; }
+  if (!st.dec || st.dec.state !== 'configured') {
+    if (kind !== 3 || annexB) return;               // VP8/VP9/AV1 have no config packet
+    configure(st, codecString(st.codecName, null));
+  }
+  if (kind === 4 && !st.key) return;
+  let bytes = data;
+  if (kind === 3) { st.key = true; if (annexB && st.cfg) bytes = joinBytes(st.cfg, data); }
+  try { st.dec.decode(new EncodedVideoChunk({ type: kind === 3 ? 'key' : 'delta', timestamp: pts, data: bytes })); }
+  catch (e) { liveFailed(st, 'Video decode error: ' + e.message); }
+}
+function drawFrame(st, f) {
+  if (st.dead || lv !== st) { f.close(); return; }
+  const w = f.displayWidth, h = f.displayHeight;
+  if (fcan.width !== w || fcan.height !== h) { fcan.width = w; fcan.height = h; }
+  fctx.drawImage(f, 0, 0, w, h);
+  f.close();
+  if (!st.shown) {
+    st.shown = true;
+    fcan.style.display = ''; fimg.style.display = 'none';
+    $('#fwait').style.display = 'none';
+    setMode('live');
+  }
+  st.n++;
+  const secs = (performance.now() - st.t0) / 1000;
+  if (secs >= 1.5) { $('#fstat').textContent = 'Live video  ' + w + '×' + h + '   ' + Math.round(st.n / secs) + ' frames a second'; st.n = 0; st.t0 = performance.now(); }
+}
+async function liveFailed(st, why) {
+  if (st.dead) return;
+  const reopen = focusId === st.id && focusToken === st.token;
+  stopLiveView();
+  setMode('snap', why);
+  if (reopen) focusLoop(st.id, st.token);
+  await poll();                               // the server knows the real reason
+  const b = boards.get(st.id);
+  if (b && b.liveError && focusId === st.id) setMode('snap', b.liveError);
+}
+function stopLiveView() {
+  if (lv) {
+    lv.dead = true;
+    try { lv.ctl.abort(); } catch (e) { /* closed */ }
+    try { if (lv.dec && lv.dec.state !== 'closed') lv.dec.close(); } catch (e) { /* closed */ }
+    lv = null;
+  }
+  fcan.style.display = 'none'; fimg.style.display = '';
+}
+
+/* snapshots: shown while live video starts, and the fallback when it is not possible */
+let snapToken = 0;
+async function focusLoop(id, token) {
+  if (snapToken === token) return;            // already running for this view
+  snapToken = token;
+  let n = 0, t0 = performance.now();
+  while (focusId === id && focusToken === token && !(lv && lv.shown)) {
+    const b = boards.get(id);
+    if (!b || b.status !== 'online') { $('#fwait').textContent = b ? look(b).title + '…' : 'Board removed'; $('#fwait').style.display = ''; await sleep(1000); continue; }
+    const start = performance.now();
+    try {
+      const f = await loadFrame(id, true);
+      if (focusId !== id || focusToken !== token) { URL.revokeObjectURL(f.url); break; }
+      if (furl) URL.revokeObjectURL(furl);
+      furl = f.url; fimg.src = f.url; natural = { w: f.w, h: f.h };
+      fimg.style.visibility = 'visible'; $('#fwait').style.display = 'none';
+      n++;
+      const secs = (performance.now() - t0) / 1000;
+      if (secs > 2 && !lv) { $('#fstat').textContent = 'Snapshots  ' + f.w + '×' + f.h + '   ' + (n / secs).toFixed(1) + ' a second'; n = 0; t0 = performance.now(); }
+    } catch (e) { await sleep(600); }
+    await sleep(Math.max(60, 200 - (performance.now() - start)));
+  }
+  if (snapToken === token) snapToken = 0;
+}
+$('#fclose').onclick = closeFocus;
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#focus').hidden && !document.querySelector('dialog[open]')) closeFocus();
+});
+document.querySelectorAll('#focus [data-key]').forEach(btn => btn.onclick = () => key(focusId, btn.dataset.key));
+$('#fmirror').onclick = () => doMirror(focusId);
+$('#fshell').onclick = () => doShell(focusId);
+$('#frestart').onclick = () => restartApp(focusId);
+$('#freboot').onclick = () => reboot(focusId);
+
+/* touch: live video sends real finger down, move and up; snapshots send tap or swipe */
+const tq = [];
+let tBusy = false;
+function sendTouch(m) {
+  const last = tq[tq.length - 1];
+  if (m.a === 'move' && last && last.a === 'move') tq[tq.length - 1] = m; else tq.push(m);
+  if (tBusy) return;
+  tBusy = true;
+  (async () => {
+    const id = focusId;
+    while (tq.length) await api('/api/boards/' + id + '/touch', tq.shift());
+    tBusy = false;
+  })();
+}
+let down = null;
+function toBoard(e, el) {
+  const r = el.getBoundingClientRect();
+  const w = el === fcan ? fcan.width : (natural.w || fimg.naturalWidth);
+  const h = el === fcan ? fcan.height : (natural.h || fimg.naturalHeight);
+  const cx = v => Math.max(0, Math.min(w - 1, Math.round(v)));
+  const cy = v => Math.max(0, Math.min(h - 1, Math.round(v)));
+  return { x: cx((e.clientX - r.left) / r.width * w), y: cy((e.clientY - r.top) / r.height * h), w, h };
+}
+function ripple(e) {
+  const rip = document.createElement('div'); rip.className = 'ripple';
+  rip.style.left = e.clientX + 'px'; rip.style.top = e.clientY + 'px';
+  document.body.appendChild(rip); setTimeout(() => rip.remove(), 600);
+}
+[fimg, fcan].forEach(el => {
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    el.setPointerCapture(e.pointerId);
+    const p = toBoard(e, el);
+    down = { e, t: performance.now(), p, live: el === fcan };
+    if (down.live) sendTouch(Object.assign({ a: 'down' }, p));
+  });
+  el.addEventListener('pointermove', e => {
+    if (down && down.live) sendTouch(Object.assign({ a: 'move' }, toBoard(e, el)));
+  });
+  el.addEventListener('pointerup', e => {
+    if (!down) return;
+    const p = toBoard(e, el);
+    if (down.live) sendTouch(Object.assign({ a: 'up' }, p));
+    else {
+      const dx = e.clientX - down.e.clientX, dy = e.clientY - down.e.clientY;
+      const ms = Math.round(performance.now() - down.t);
+      if (Math.hypot(dx, dy) < 8) api('/api/boards/' + focusId + '/tap', p);
+      else api('/api/boards/' + focusId + '/swipe', { x1: down.p.x, y1: down.p.y, x2: p.x, y2: p.y, ms: Math.min(1500, Math.max(120, ms)) });
+    }
+    ripple(e);
+    down = null;
+  });
+  el.addEventListener('pointercancel', () => {
+    if (down && down.live) sendTouch(Object.assign({ a: 'up' }, down.p));
+    down = null;
+  });
+});
+
+/* ---------- go ---------- */
+const openId = new URLSearchParams(location.search).get('open');
+poll().then(() => {
+  if (openId && boards.has(openId)) { history.replaceState(null, '', '/'); openFocus(openId); }
+});
+const pollTimer = setInterval(poll, 2000);
+async function healthBadges() {
+  try {
+    const r = await fetch('/api/health', { cache: 'no-store' });
+    const j = await r.json();
+    const open = (j.issues || []).filter(i => !i.resolvedAt).length;
+    const nw = (j.found || []).filter(f => f.status === 'found' || f.status === 'claiming').length;
+    $('#navIssues').hidden = !open; $('#navIssues').textContent = open;
+    $('#navNew').hidden = !nw; $('#navNew').textContent = nw;
+  } catch (e) { /* server stopped */ }
+}
+healthBadges();
+setInterval(healthBadges, 6000);
+})();
+</script>
+<script src="/remote-banner.js"></script>
+</body>
+</html>

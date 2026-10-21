@@ -10,7 +10,7 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clip = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
 const bad = (status, message) => Object.assign(new Error(message), { status });
 
-function create(agents) {
+function create(agents, updates) {
   const routes = [];
   const on = (method, pattern, fn) => routes.push({ method, re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[0-9a-f-]{36})') + '$'), fn });
 
@@ -22,7 +22,7 @@ function create(agents) {
 
   /* ---------- hospitals ---------- */
   on('GET', '/api/hospitals', async (A) => {
-    const r = await db.tx(A, c => c.query(`select h.id, h.name, h.entra_tenant_id,
+    const r = await db.tx(A, c => c.query(`select h.id, h.name, h.entra_tenant_id, h.update_mode, h.update_ring,
         (select count(*)::int from br.devices d where d.hospital_id = h.id) devices,
         (select count(*)::int from br.device_state s where s.hospital_id = h.id and s.state in ('online', 'late', 'degraded')) up,
         (select count(*)::int from br.device_state s where s.hospital_id = h.id and s.state = 'offline') down,
@@ -64,7 +64,9 @@ function create(agents) {
              from br.device_reach r join br.agents a on a.id = r.agent_id where r.device_id = d.id) reach
         from br.devices d left join br.device_state s on s.device_id = d.id left join br.users lu on lu.id = d.locked_by
         where d.hospital_id = $1 order by d.unit, d.room, d.kind`, [p.id])).rows;
-      const pcs = (await c.query('select id, name, pc_name, version, last_seen, enrolled_at from br.agents where hospital_id = $1 and revoked_at is null order by name', [p.id])).rows;
+      const pcs = (await c.query('select id, name, pc_name, version, last_seen, enrolled_at, service, update_state, update_version, update_detail, update_at from br.agents where hospital_id = $1 and revoked_at is null order by name', [p.id])).rows;
+      const upd = (await c.query('select update_mode, update_ring, (select version from br.br_releases where id = br.target_release($1)) target from br.hospitals where id = $1', [p.id])).rows[0];
+      h.updates = upd;
       return { hospital: h, devices, pcs: pcs.map(x => Object.assign(x, { online: agents.isOnline(x.id) })) };
     });
     return Object.assign({ ok: true }, r);
@@ -169,6 +171,14 @@ function create(agents) {
       return { ok: true, message: email + ' can now sign in with Microsoft as ' + ROLE_NAME[role] + '.' };
     });
   }
+
+  /* ---------- Board Remote program updates ---------- */
+  on('GET', '/api/releases', async (A) => { if (!A.user.hciRole) throw bad(403, 'HCI only.'); return updates.list(A); });
+  on('POST', '/api/releases', async (A, b) => updates.upload(A, b));
+  on('POST', '/api/releases/:id/status', async (A, b, p) => updates.setStatus(A, p.id, String(b.status || '')));
+  on('PATCH', '/api/hospitals/:id/updates', async (A, b, p) => updates.setHospital(A, p.id, b));
+  on('POST', '/api/agents/:id/approve', async (A, b, p) => updates.approve(A, { agentId: p.id }));
+  on('POST', '/api/hospitals/:id/approve', async (A, b, p) => updates.approve(A, { hospitalId: p.id }));
 
   /* ---------- audit log ---------- */
   on('GET', '/api/hospitals/:id/audit', async (A, b, p, q) => {

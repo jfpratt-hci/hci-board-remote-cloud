@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit · Board Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231E1C19'/%3E%3Cpath d='M7 12l3 3 7-7' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ground:#F2EFE9; --card:#FFFFFF; --soft:#F6F4EF; --line:#E7E2D9;
+  --ink:#1E1C19; --ink2:#3A3733; --muted:#7A766F;
+  --green:#14A44D; --green-bg:#E2F4E8;
+  --amber:#C98204; --amber-bg:#FCF0D6;
+  --red:#D93A2F;   --red-bg:#FBE4E1;
+  --blue:#2563EB;  --blue-bg:#E3EBFD;
+  --grey:#8C877F;  --grey-bg:#ECE8E1;
+  --r:16px; --g:16px;
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ground);color:var(--ink);font:500 14px/1.4 var(--font);display:grid;grid-template-rows:auto 1fr;gap:var(--g);padding:var(--g);overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+a{color:inherit}
+[hidden]{display:none!important}
+.label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--soft);font-weight:700;font-size:13px;white-space:nowrap;text-decoration:none;transition:background .15s}
+.btn:hover{background:var(--grey-bg)}
+.btn.dark{background:var(--ink);color:#fff}.btn.dark:hover{background:#34312c}
+.btn.sm{height:32px;padding:0 12px;font-size:12px;border-radius:10px}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.link{font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:12px;cursor:pointer}
+.link:hover{color:var(--ink)}
+
+/* top bar (same as every view) */
+.top{background:var(--card);border-radius:var(--r);padding:10px 14px;display:grid;grid-template-columns:auto auto 1fr auto;gap:18px;align-items:center}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:40px;height:40px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.brand .mark svg{width:22px;height:22px}
+.brand .kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.nav{display:inline-flex;padding:4px;border-radius:999px;background:var(--soft);gap:2px}
+.nav a{height:34px;padding:0 14px;border-radius:999px;color:var(--muted);font-weight:800;font-size:13px;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;text-decoration:none}
+.nav a.on{background:var(--ink);color:#fff}
+.nav a svg{width:14px;height:14px}
+.actions-top{display:flex;gap:8px}
+@media (max-width:1560px){.actions-top .btn span{display:none}.actions-top .btn{padding:0 12px}}
+
+/* three columns */
+.agrid{min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr) 380px;gap:var(--g)}
+@media (max-width:1440px){.agrid{grid-template-columns:300px minmax(0,1fr) 330px}}
+.col{min-height:0;display:grid;gap:var(--g);align-content:start;grid-auto-rows:min-content;overflow:auto}
+.card{background:var(--card);border-radius:var(--r);padding:16px;display:grid;gap:12px;align-content:start;min-height:0}
+.card h2{margin:0;font-size:16px;font-weight:800}
+.hrow{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-weight:700;font-size:11.5px;background:var(--soft);color:var(--ink2);white-space:nowrap}
+.chip.ok{background:var(--green-bg);color:#0d7a38}.chip.warn{background:var(--amber-bg);color:#8a5a00}.chip.bad{background:var(--red-bg);color:#a82a22}.chip.info{background:var(--blue-bg);color:#1d4fc4}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* list card */
+.drop{display:grid;gap:8px;border:1.5px dashed var(--line);border-radius:12px;padding:10px;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--blue);background:var(--blue-bg)}
+textarea{width:100%;min-height:150px;resize:vertical;border:0;outline:0;background:transparent;font:500 12.5px/1.45 var(--mono)}
+.preview{font-size:12px;color:var(--muted)}
+.field{display:grid;gap:4px}
+.in{height:36px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--card)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.checks label{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;background:var(--soft);font-size:12px;font-weight:700;cursor:pointer}
+.checks input{accent-color:var(--ink)}
+details summary{cursor:pointer;font-weight:800;font-size:13px;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details[open] summary{margin-bottom:10px}
+.big{font-size:26px;font-weight:800;line-height:1}
+.pbar{height:6px;border-radius:99px;background:var(--soft);overflow:hidden}.pbar i{display:block;height:100%;background:var(--ink);width:0;transition:width .3s}
+
+/* report */
+.rep{background:var(--card);border-radius:var(--r);padding:16px;display:grid;grid-template-rows:auto auto auto auto minmax(0,1fr);gap:12px;min-height:0}
+.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.stat{background:var(--soft);border-radius:12px;padding:10px 12px;display:grid;gap:2px;cursor:pointer;border:2px solid transparent}
+.stat.on{border-color:var(--ink)}
+.stat b{font-size:22px;font-weight:800;line-height:1.1}
+.stat span{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat.bad b{color:var(--red)}.stat.warn b{color:var(--amber)}.stat.ok b{color:var(--green)}
+.tablewrap{overflow:auto;min-height:0;border-radius:12px;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--soft);text-align:left;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:9px 10px;z-index:1}
+td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:middle}
+tr.r{cursor:pointer}tr.r:hover td{background:#FBFAF7}tr.r.sel td{background:var(--blue-bg)}
+.room{font-weight:800;font-variant-numeric:tabular-nums}
+.pair{display:inline-flex;gap:4px;align-items:center}
+.dot{width:22px;height:22px;border-radius:7px;display:inline-grid;place-items:center;font-size:10px;font-weight:800;background:var(--soft);color:var(--muted)}
+.dot.y{background:var(--ink);color:#fff}
+.dot.miss{background:var(--red);color:#fff}.dot.xtra{background:var(--amber);color:#fff}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+/* detail */
+.shot{border-radius:12px;overflow:hidden;background:#111;display:grid;place-items:center;aspect-ratio:16/9}
+.shot img{min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;display:block;cursor:zoom-in}
+.bd{display:grid;gap:8px;padding:12px;border-radius:12px;background:var(--soft)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px}.kv dt{color:var(--muted);font-weight:700}.kv dd{margin:0}
+.hist{display:grid;gap:6px}
+.day{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--soft);cursor:pointer;font-size:12.5px}
+.day.on{background:var(--ink);color:#fff}.day.on .chip{background:rgba(255,255,255,.15);color:#fff}
+
+.toasts{position:fixed;right:20px;bottom:20px;display:grid;gap:8px;z-index:50}
+.toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.toast.err{background:var(--red)}
+dialog{border:0;border-radius:16px;padding:0;max-width:92vw;max-height:92vh;background:#111}
+dialog img{display:block;max-width:92vw;max-height:92vh}
+dialog::backdrop{background:rgba(20,18,15,.7)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="mark"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
+  </div>
+  <nav class="nav" aria-label="Views">
+    <a href="/"><svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4"/></svg>Boards</a>
+    <a href="/health"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8l1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>Device health</a>
+    <a href="/health#new"><svg viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></svg>New devices</a>
+    <a href="/deploy"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Deploy</a>
+    <a class="on" href="/audit"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Audit</a>
+    <a class="navRemote" href="/remote"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1"/></svg>Remote</a>
+  </nav>
+  <div></div>
+  <div class="actions-top">
+    <a class="btn" id="btnCsv" href="#" title="This day's report as a spreadsheet"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg><span>Report CSV</span></a>
+    <a class="btn" href="/manual#audit" title="Manual"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg><span>Manual</span></a>
+    <button class="btn dark" id="btnRun"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Run audit now</span></button>
+  </div>
+</header>
+
+<main class="agrid">
+  <section class="col">
+    <div class="card">
+      <div class="hrow"><h2>Hospital's list</h2><span class="label" id="listDay"></span></div>
+      <div class="muted" style="font-size:12.5px">The rooms that should show a fall risk or contact infotile today. Room numbers only, no patient names.</div>
+      <div id="listNow"></div>
+      <label class="drop" id="drop">
+        <textarea id="listText" spellcheck="false" placeholder="Paste the morning list, any of these work:&#10;&#10;Room, Fall risk, Contact&#10;401, Y,&#10;402, Y, Y&#10;&#10;or&#10;Fall risk: 401, 405&#10;Contact: 402, 405&#10;&#10;or drop a CSV file here"></textarea>
+        <input type="file" id="file" accept=".csv,.txt,.tsv" hidden>
+      </label>
+      <div class="preview" id="preview">&nbsp;</div>
+      <div class="row2"><button class="btn dark" id="btnSaveList">Save list</button><button class="btn" id="btnFile">Choose file</button></div>
+      <div class="muted" style="font-size:11.5px">A file dropped into <span class="mono" id="inbox"></span> is loaded on its own within a minute.</div>
+    </div>
+
+    <div class="card">
+      <div class="hrow"><h2>Morning audit</h2><span class="chip" id="schedChip"></span></div>
+      <div id="runNow"></div>
+      <details>
+        <summary>Settings</summary>
+        <div style="display:grid;gap:10px">
+          <label class="checks" style="display:flex"><label><input type="checkbox" id="sOn"> Run every morning</label><label><input type="checkbox" id="sTeams"> Post summary to Teams</label></label>
+          <div class="row2">
+            <label class="field"><span class="label">Time</span><input class="in" id="sTime" type="time"></label>
+            <label class="field"><span class="label">Keep (days)</span><input class="in" id="sKeep" type="number" min="7" max="730"></label>
+          </div>
+          <div class="field"><span class="label">Boards to audit</span><div class="checks" id="sKinds"></div></div>
+          <label class="field"><span class="label">Fall risk tile words</span><input class="in" id="sFall"></label>
+          <label class="field"><span class="label">Contact tile words</span><input class="in" id="sContact"></label>
+          <div class="muted" style="font-size:11.5px">A tile counts when a piece of text on the screen is exactly one of these words, so "Contact your nurse" is not a contact tile.</div>
+          <button class="btn" id="btnSaveSet">Save settings</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section class="rep">
+    <div class="hrow"><div><h2 id="repTitle" style="margin:0;font-size:18px;font-weight:800">Report</h2><div class="muted" id="repSub" style="font-size:12.5px"></div></div><div class="chips" id="repChips"></div></div>
+    <div class="stats" id="stats"></div>
+    <div class="hrow" style="font-size:12px;color:var(--muted);justify-content:flex-start;gap:14px;flex-wrap:wrap"><span><span class="dot y">L</span> on the hospital's list</span><span><span class="dot y">S</span> on the screen</span><span><span class="dot miss">S</span> on the list, missing on screen</span><span><span class="dot xtra">S</span> on screen, not on the list</span></div>
+    <div class="muted" id="gapNote" style="font-size:12.5px" hidden></div>
+    <div class="tablewrap"><table><thead><tr><th>Room</th><th>Unit</th><th>Fall risk</th><th>Contact</th><th>Result</th><th>Overnight</th><th>Boards</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+
+  <section class="col">
+    <div class="card" id="detail"><h2>Room</h2><p class="muted" style="margin:0">Pick a room to see its snapshot, what the screen showed and when it dropped.</p></div>
+    <div class="card"><div class="hrow"><h2>History</h2><span class="label" id="histCount"></span></div><div class="hist" id="hist"></div></div>
+  </section>
+</main>
+
+<dialog id="zoom"><img id="zoomImg" alt="Snapshot"></dialog>
+<div class="toasts" id="toasts"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const KINDS = { wb: 'Whiteboards', ds: 'Door signs', tv: 'Patient TVs', cam: 'Cameras', tab: 'Tablets', usb: 'Unit Status Boards', other: 'Type not set' };
+const KIND1 = { wb: 'Whiteboard', ds: 'Door sign', tv: 'Patient TV', cam: 'Camera', tab: 'Tablet', usb: 'Unit Status Board', other: 'Device' };
+async function api(path, body) {
+  const init = { method: body === undefined ? 'GET' : 'POST', headers: { 'X-Board-Remote': '1' } };
+  if (body !== undefined) { init.body = JSON.stringify(body); init.headers['Content-Type'] = 'application/json'; }
+  try { const r = await fetch(path, init); const t = await r.text(); let j; try { j = JSON.parse(t); } catch (e) { j = { ok: r.ok, message: t }; } if (j.ok === undefined) j.ok = r.ok; return j; }
+  catch (e) { return { ok: false, message: 'Board Remote is not running. Double click START.bat.' }; }
+}
+function toast(msg, err) { if (!msg) return; const el = document.createElement('div'); el.className = 'toast' + (err ? ' err' : ''); el.textContent = msg; $('#toasts').appendChild(el); setTimeout(() => el.remove(), err ? 9000 : 4500); }
+const report = j => { toast(j.message, !j.ok); return j; };
+const pad = n => String(n).padStart(2, '0');
+const clock = t => { const d = new Date(t); return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+const when = t => { const d = new Date(t), today = new Date(); return (d.toDateString() === today.toDateString() ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ') + clock(t); };
+const dayLabel = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); };
+const mins = m => m < 1 ? 'under a minute' : m < 60 ? Math.round(m) + ' min' : Math.floor(m / 60) + ' h ' + pad(Math.round(m % 60)) + ' min';
+
+const S = { day: null, state: null, rep: null, sel: null, filter: 'problems' };
+const STATUS = { match: ['ok', 'Matches'], missing: ['bad', 'Missing on screen'], extra: ['warn', 'On screen, not on list'], unknown: ['info', 'Could not check'], nodevice: ['info', 'No board'], nolist: ['', 'No list yet'] };
+
+async function loadState() {
+  const j = await api('/api/audit/state'); if (!j.ok) return report(j);
+  S.state = j; if (!S.day) S.day = j.today;
+  $('#inbox').textContent = j.inbox;
+  const s = j.settings;
+  $('#schedChip').textContent = s.enabled ? 'Daily at ' + clock(new Date().setHours(+s.time.split(':')[0], +s.time.split(':')[1], 0, 0)) : 'Off';
+  $('#schedChip').className = 'chip ' + (s.enabled ? 'ok' : '');
+  if (!$('#sTime').matches(':focus')) {
+    $('#sOn').checked = s.enabled; $('#sTeams').checked = s.teams; $('#sTime').value = s.time; $('#sKeep').value = s.keepDays; $('#sFall').value = s.fall; $('#sContact').value = s.contact;
+    $('#sKinds').innerHTML = Object.keys(KINDS).map(k => '<label><input type="checkbox" value="' + k + '"' + (s.kinds.indexOf(k) >= 0 ? ' checked' : '') + '> ' + KINDS[k] + '</label>').join('');
+  }
+  if (j.running) {
+    const pc = Math.round(100 * j.running.done / Math.max(1, j.running.total));
+    $('#runNow').innerHTML = '<div style="display:grid;gap:6px"><div class="hrow"><b>Auditing ' + j.running.done + ' of ' + j.running.total + ' boards</b><span class="muted">' + pc + '%</span></div><div class="pbar"><i style="width:' + pc + '%"></i></div></div>';
+    $('#btnRun').disabled = true;
+  } else {
+    $('#btnRun').disabled = false;
+    $('#runNow').innerHTML = '<div class="kv"><dt>Boards</dt><dd>' + j.audited + ' with a room</dd><dt>Next run</dt><dd>' + (j.nextRunAt ? when(j.nextRunAt) : 'Off') + '</dd><dt>Teams</dt><dd>' + (s.teams ? (j.hasTeams ? 'Summary to HCI Support' : 'No Teams link set under Device health') : 'Off') + '</dd></div>';
+  }
+  $('#histCount').textContent = j.days.length ? j.days.length + ' days' : '';
+  $('#hist').innerHTML = j.days.length ? j.days.map(d => {
+    const s2 = d.summary;
+    const chip = !s2 ? '<span class="chip">' + (d.hasList ? 'List only' : 'No run') + '</span>' : !d.hasList ? '<span class="chip">No list</span>' : s2.mismatch ? '<span class="chip bad">' + s2.mismatch + ' off</span>' : '<span class="chip ok">All match</span>';
+    return '<div class="day' + (d.day === S.day ? ' on' : '') + '" data-day="' + d.day + '"><span><b>' + esc(dayLabel(d.day)) + '</b>' + (s2 ? ' <span class="muted"' + (d.day === S.day ? ' style="color:#d8d4cc"' : '') + '>' + s2.rooms + ' rooms' + (s2.drops ? ', ' + s2.drops + ' dropped' : '') + '</span>' : '') + '</span>' + chip + '</div>';
+  }).join('') : '<p class="muted" style="margin:0">No audits yet. The first one runs at the set time, or press Run audit now.</p>';
+}
+
+async function loadDay() {
+  const j = await api('/api/audit/day?day=' + S.day); if (!j.ok) return report(j);
+  S.rep = j; renderReport(); renderList(); renderDetail();
+  $('#btnCsv').href = '/api/audit/report.csv?day=' + S.day;
+}
+
+function renderList() {
+  const j = S.rep; $('#listDay').textContent = dayLabel(S.day);
+  $('#listNow').innerHTML = j.list
+    ? '<div class="chips"><span class="chip ok">' + j.list.count + ' rooms</span><span class="chip">' + j.list.fall + ' fall risk</span><span class="chip">' + j.list.contact + ' contact</span><span class="chip">' + (j.list.source === 'inbox' ? 'From inbox' : j.list.source === 'file' ? 'From file' : 'Pasted') + ' ' + clock(j.list.at) + '</span><a class="link" id="btnClear">Remove</a></div>'
+    : '<span class="chip warn">No list for ' + esc(dayLabel(S.day)) + ' yet</span>';
+  const c = $('#btnClear'); if (c) c.onclick = async () => { if (!confirm('Remove the list for ' + dayLabel(S.day) + '?')) return; report(await api('/api/audit/expected/clear', { day: S.day })); refresh(); };
+}
+
+function cell(want, shown) {
+  // want is null when there is no hospital list for the day: then only the screen is shown
+  if (want === null) return '<span class="pair" title="Screen ' + (shown ? 'yes' : 'no') + '"><span class="dot' + (shown ? ' y' : '') + '">S</span></span>';
+  const cls = want && !shown ? ' miss' : !want && shown ? ' xtra' : shown ? ' y' : '';
+  return '<span class="pair" title="List ' + (want ? 'yes' : 'no') + ', screen ' + (shown ? 'yes' : 'no') + '"><span class="dot' + (want ? ' y' : '') + '">L</span><span class="dot' + cls + '">S</span></span>';
+}
+function renderReport() {
+  const j = S.rep, c = j.counts;
+  $('#repTitle').textContent = 'Audit for ' + dayLabel(j.day);
+  $('#repSub').textContent = j.run ? 'Run at ' + clock(j.run.at) + (j.run.reason === 'morning' ? ' (morning schedule)' : ' (run by hand)') + ', covering ' + when(j.run.from) + ' to ' + clock(j.run.at) : 'No audit has run for this day yet.';
+  $('#repChips').innerHTML = j.runs.length > 1 ? '<select class="in" id="runPick" style="height:30px">' + j.runs.map(n => '<option value="' + n + '"' + (j.run && n === j.run.name ? ' selected' : '') + '>Run ' + n.slice(4, 6) + ':' + n.slice(6, 8) + '</option>').join('') + '</select>' : '';
+  const rp = $('#runPick'); if (rp) rp.onchange = async () => { const r = await api('/api/audit/day?day=' + S.day + '&run=' + rp.value); S.rep = r; renderReport(); renderDetail(); };
+  const st = [['problems', 'bad', c.missing + c.extra, 'Not matching'], ['missing', 'bad', c.missing, 'Missing on screen'], ['extra', 'warn', c.extra, 'Not on list'], ['unknown', '', c.unknown, 'Could not check'], ['match', 'ok', c.match, 'Matching'], ['all', '', c.rooms, 'All rooms']];
+  $('#stats').innerHTML = st.map(x => '<div class="stat ' + x[1] + (S.filter === x[0] ? ' on' : '') + '" data-f="' + x[0] + '"><b>' + x[2] + '</b><span>' + x[3] + '</span></div>').join('');
+  const gaps = j.run ? j.run.gaps : [];
+  $('#gapNote').hidden = !(gaps.length || c.droppedBoards || (j.run && !j.hasList));
+  $('#gapNote').innerHTML = [
+    j.run && !j.hasList ? '<b>No hospital list for this day yet</b>, so screens are shown but not compared. Paste the list and the report compares at once.' : '',
+    c.droppedBoards ? '<b>' + c.droppedBoards + ' board' + (c.droppedBoards > 1 ? 's' : '') + ' dropped</b> during the night (see the Overnight column).' : '',
+    gaps.length ? '<b>Board Remote was not running</b> ' + gaps.map(g => when(g.from) + ' to ' + clock(g.to)).join(', ') + ', so nothing was recorded then.' : ''
+  ].filter(Boolean).join(' ');
+  const f = S.filter;
+  const rows = j.rooms.filter(r => f === 'all' ? true : f === 'problems' ? (r.status === 'missing' || r.status === 'extra') : f === 'unknown' ? (r.status === 'unknown' || r.status === 'nodevice') : r.status === f);
+  $('#rows').innerHTML = rows.length ? rows.map(r => {
+    const s = STATUS[r.status] || ['', r.status];
+    const dn = r.boards.reduce((n, b) => n + b.downs.length, 0);
+    return '<tr class="r' + (S.sel === r.key ? ' sel' : '') + '" data-k="' + esc(r.key) + '"><td class="room">' + esc(r.room) + '</td><td class="muted">' + esc(r.unit || '') + '</td><td>' + cell(r.want ? r.want.fall : null, r.shown.fall) + '</td><td>' + cell(r.want ? r.want.contact : null, r.shown.contact) + '</td><td><span class="chip ' + s[0] + '">' + s[1] + '</span></td><td>' + (dn ? '<span class="chip warn">Dropped ' + dn + 'x, ' + mins(r.downMin) + '</span>' : '<span class="muted">Stayed on</span>') + '</td><td class="muted">' + r.boards.map(b => KIND1[b.kind] || b.kind).join(', ') + '</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="empty">' + (!j.rooms.length ? 'Nothing yet for this day. Run the audit, or paste the hospital\'s list.' : f === 'problems' ? 'Every checked room matches the list.' : 'No rooms here.') + '</td></tr>';
+}
+
+function renderDetail() {
+  const r = S.rep && S.rep.rooms.find(x => x.key === S.sel);
+  if (!r) { $('#detail').innerHTML = '<h2>Room</h2><p class="muted" style="margin:0">Pick a room to see its snapshot, what the screen showed and when it dropped.</p>'; return; }
+  const s = STATUS[r.status] || ['', r.status];
+  let h = '<div class="hrow"><h2>Room ' + esc(r.room) + '</h2><span class="chip ' + s[0] + '">' + s[1] + '</span></div>';
+  h += '<dl class="kv"><dt>List</dt><dd>' + (r.want ? [r.want.fall ? 'Fall risk' : '', r.want.contact ? 'Contact' : ''].filter(Boolean).join(', ') || 'Neither' : 'No list for this day') + '</dd><dt>Screen</dt><dd>' + ([r.shown.fall ? 'Fall risk' : '', r.shown.contact ? 'Contact' : ''].filter(Boolean).join(', ') || 'Neither') + '</dd>' + (r.issues.length ? '<dt>Found</dt><dd>' + esc(r.issues.join('; ')) + '</dd>' : '') + '</dl>';
+  for (const b of r.boards) {
+    h += '<div class="bd"><div class="hrow"><b>' + esc(b.name) + '</b><span class="chip ' + (b.online ? 'ok' : 'bad') + '">' + (b.online ? 'Connected' : 'Not connected') + '</span></div>';
+    if (b.shot) h += '<div class="shot"><img src="/api/audit/shot?day=' + S.rep.day + '&f=' + encodeURIComponent(b.shot) + '" alt="Snapshot of ' + esc(b.name) + '" data-zoom="1"></div>';
+    h += '<dl class="kv"><dt>Read</dt><dd>' + (b.readable ? (b.matched.length ? 'Tiles: ' + esc(b.matched.join(', ')) : 'No fall risk or contact tile') : esc(b.why)) + '</dd>';
+    h += '<dt>Overnight</dt><dd>' + (b.downs.length ? b.downs.map(d => 'Down ' + when(d.from) + ' to ' + (d.to ? clock(d.to) : 'audit time')).join('<br>') : 'Stayed on') + '</dd></dl></div>';
+  }
+  if (!r.boards.length) h += '<p class="muted" style="margin:0">No audited board has this room. Check the room on the Boards page, or the board types in Settings.</p>';
+  $('#detail').innerHTML = h;
+}
+
+/* list input */
+let pvT = 0;
+$('#listText').addEventListener('input', () => { clearTimeout(pvT); pvT = setTimeout(async () => {
+  const t = $('#listText').value; if (!t.trim()) { $('#preview').innerHTML = '&nbsp;'; return; }
+  const j = await api('/api/audit/expected', { preview: true, text: t });
+  $('#preview').textContent = j.ok ? 'Reads as ' + j.parsed.count + ' rooms: ' + j.parsed.fall + ' fall risk, ' + j.parsed.contact + ' contact.' : 'No rooms found yet.';
+}, 250); });
+let fileName = '';
+async function takeFile(f) { if (!f) return; fileName = f.name; $('#listText').value = await f.text(); $('#listText').dispatchEvent(new Event('input')); }
+$('#btnFile').onclick = () => $('#file').click();
+$('#file').onchange = e => takeFile(e.target.files[0]);
+const drop = $('#drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); takeFile(e.dataTransfer.files[0]); });
+$('#btnSaveList').onclick = async () => {
+  const t = $('#listText').value; if (!t.trim()) return toast('Paste the list first.', true);
+  const j = report(await api('/api/audit/expected', { day: S.day, text: t, source: fileName ? 'file' : 'paste', name: fileName }));
+  if (j.ok) { $('#listText').value = ''; $('#preview').innerHTML = '&nbsp;'; fileName = ''; S.filter = 'problems'; refresh(); }
+};
+
+/* run and settings */
+$('#btnRun').onclick = async () => { report(await api('/api/audit/run', {})); S.day = S.state ? S.state.today : S.day; setTimeout(refresh, 600); };
+$('#btnSaveSet').onclick = async () => {
+  const kinds = [...document.querySelectorAll('#sKinds input:checked')].map(i => i.value);
+  report(await api('/api/audit/settings', { enabled: $('#sOn').checked, teams: $('#sTeams').checked, time: $('#sTime').value, keepDays: $('#sKeep').value, kinds, fall: $('#sFall').value, contact: $('#sContact').value }));
+  refresh();
+};
+
+/* clicks */
+document.addEventListener('click', e => {
+  const st = e.target.closest('.stat'); if (st) { S.filter = st.dataset.f; renderReport(); return; }
+  const tr = e.target.closest('tr.r'); if (tr) { S.sel = tr.dataset.k; renderReport(); renderDetail(); return; }
+  const dy = e.target.closest('.day'); if (dy) { S.day = dy.dataset.day; S.sel = null; refresh(); return; }
+  const z = e.target.closest('[data-zoom]'); if (z) { $('#zoomImg').src = z.src; $('#zoom').showModal(); return; }
+  if (e.target.id === 'zoom') $('#zoom').close();
+});
+
+async function refresh() { await loadState(); await loadDay(); }
+refresh();
+setInterval(() => { loadState().then(() => { if (S.state && S.state.running) loadDay(); }); }, 4000);
+let wasRunning = false;
+setInterval(() => { const r = !!(S.state && S.state.running); if (wasRunning && !r) loadDay(); wasRunning = r; }, 1000);
+})();
+</script>
+</body>
+</html>

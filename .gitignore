@@ -1,3 +1,15 @@
 node_modules/
 *.log
 .env
+# Board Remote's own data when run from the source folder
+board-remote/boards.json
+board-remote/boards.json.tmp
+board-remote/deploy.json
+board-remote/health.json
+board-remote/remote.json
+board-remote/logs/
+board-remote/audit/
+board-remote/snapshots/
+board-remote/tools/
+board-remote/apks/library/
+dist/

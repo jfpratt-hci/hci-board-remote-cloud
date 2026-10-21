@@ -1,0 +1,1125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Device Health</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='5' width='28' height='19' rx='4' fill='%231E1C19'/%3E%3Ccircle cx='24' cy='11' r='3' fill='%2314A44D'/%3E%3Crect x='11' y='26' width='10' height='3' rx='1.5' fill='%231E1C19'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+/* Device Health for HCI ONE Board Remote. Two views on one shell, on a three column grid:
+   Device health (heartbeat wall, the selected board from power up to screen with its console, issues and who got told)
+   and New devices (devices found on the network or USB, the claim, how it works). Look follows the HCI ONE v2.1 board tokens. */
+:root{
+  --bg:#F4F1EC;--card:#FFFFFF;--card2:#F7F5F0;--line:#E6E1D8;--pill:#F1EEE7;
+  --ink:#141414;--muted:#7A766F;--muted2:#A39E95;
+  --hero:#19B34A;--hero-deep:#0F7A33;--blue:#2F6DF6;--purple:#6D4FD8;--gold:#F5C400;--warn:#EF3A33;--deg-line:#B97800;
+  --ok-tint:#DCEFE3;--ok-ink:#0D3D26;--cau-tint:#FFF1B8;--cau-ink:#5C4700;--bad-tint:#FFE1DF;--bad-ink:#B3120C;--info-tint:#DFE8FF;--info-ink:#1F47B3;--ai-tint:#F0EBFF;--ai-ink:#4B2AB3;
+  --fill-ok:#0F7A33;--fill-ok-ink:#FFFFFF;--fill-bad:#C4211B;--fill-bad-ink:#FFFFFF;--fill-cau:#F5C400;--fill-cau-ink:#1F1A00;--fill-info:#2F6DF6;--fill-info-ink:#FFFFFF;--fill-ai:#6D4FD8;--fill-ai-ink:#FFFFFF;
+  --band:rgba(239,58,51,.12);--code-bg:#16181D;--code-ink:#E9E6DF;--code-dim:#8C887F;--code-err:#FF8A84;--code-warn:#FFD86B;
+  --bezel:#0B0B0B;--shadow:0 8px 24px rgba(20,20,20,.06);
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --r:22px;--r-sm:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-weight:600;font-size:14px;letter-spacing:.01em;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit;letter-spacing:inherit}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3,h4,p{margin:0}
+[hidden]{display:none!important}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-xs{width:14px;height:14px}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.rowx{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.eyebrow{font-weight:800;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-weight:800;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;background:var(--pill);color:var(--muted);white-space:nowrap}
+.chip .ic{width:13px;height:13px}
+.c-ok{background:var(--ok-tint);color:var(--ok-ink)}.c-cau{background:var(--cau-tint);color:var(--cau-ink)}.c-bad{background:var(--bad-tint);color:var(--bad-ink)}.c-info{background:var(--info-tint);color:var(--info-ink)}.c-ai{background:var(--ai-tint);color:var(--ai-ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:999px;border:0;font-weight:800;font-size:13px;cursor:pointer;background:var(--pill);color:var(--ink);transition:transform .15s,filter .15s;text-decoration:none;white-space:nowrap}
+.btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.04)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn .ic{width:17px;height:17px}
+.b-ai{background:var(--fill-ai);color:var(--fill-ai-ink)}.b-ok{background:var(--fill-ok);color:var(--fill-ok-ink)}.b-info{background:var(--fill-info);color:var(--fill-info-ink)}.b-dark{background:var(--ink);color:#fff}
+select,.in{min-height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:13px;font-weight:700;max-width:100%;width:100%}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;font-weight:700;line-height:1.4;cursor:pointer}
+.check input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--hero-deep);flex:none}
+.radio{display:flex;flex-direction:column;gap:6px}
+.radio label{display:flex;gap:10px;align-items:flex-start;font-size:13px;font-weight:700;line-height:1.4;cursor:pointer;padding:10px 12px;border-radius:12px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}
+.radio input{margin:2px 0 0;accent-color:var(--hero-deep);flex:none}
+.radio small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+
+.app{display:flex;flex-direction:column;gap:16px;padding:16px;min-height:100%;max-width:1760px;margin-inline:auto}
+
+/* header, shared with the Boards view */
+.top{background:var(--card);border-radius:16px;padding:10px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;box-shadow:var(--shadow)}
+@media (min-width:1100px){.top{flex-wrap:nowrap}}
+@media (max-width:1560px){.stat .l{display:none}.stat{padding:7px 12px 7px 10px}.site .chip span{display:none}}
+@media (max-width:1300px){.top .site{display:none}}
+.brand h1,.stat .v{white-space:nowrap}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:40px;height:40px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.mark .ic{width:22px;height:22px}
+.kicker{font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+h1{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.nav{display:inline-flex;padding:4px;border-radius:999px;background:var(--pill);gap:2px}
+.nav a,.nav button{min-height:34px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;text-decoration:none}
+.nav .on{background:var(--ink);color:#fff}
+.nav .cnt{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--fill-info);color:#fff;font-size:11px;display:inline-grid;place-items:center}
+.site{display:flex;flex-direction:column;gap:4px;min-width:0;flex:0 1 auto}
+.sitename{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sitename{font-weight:800;font-size:14px}
+.stats{margin-inline-start:auto;display:flex;flex-wrap:nowrap;gap:6px;align-items:center}
+.stat{display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 11px;border-radius:999px;background:var(--card2)}
+.stat .v{font-weight:800;font-size:18px;font-variant-numeric:tabular-nums;line-height:1}
+.stat .l{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.stat .hb{color:var(--warn);display:flex}
+.stat .hb.go{animation:hb .9s ease-out}
+@keyframes hb{0%{transform:scale(1)}25%{transform:scale(1.35)}50%{transform:scale(1)}65%{transform:scale(1.18)}100%{transform:scale(1)}}
+.iconbtn{width:40px;height:40px;border-radius:999px;border:0;background:var(--pill);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+
+/* columns */
+.main{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);align-items:start}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (min-width:820px){.main{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.col-side{grid-column:1 / -1}}
+@media (min-width:1240px){
+  html,body{overflow:hidden}
+  .app{height:100%}
+  .main{flex:1 1 auto;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1.2fr) minmax(0,.85fr);align-items:stretch}
+  .main.disc{grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr) minmax(0,.85fr)}
+  .main.adm{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .col-side{grid-column:auto}
+  .col{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 6px 18px;margin:-2px -6px 0;scrollbar-width:thin}
+}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.mh{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:800;text-transform:uppercase}
+.mh .n{margin-inline-start:auto;background:var(--pill);border-radius:999px;padding:3px 10px;color:var(--ink);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.note{font-size:12.5px;line-height:1.5;color:var(--muted);font-weight:600}
+
+/* heartbeat wall */
+#wall{display:flex;flex-direction:column;gap:16px}
+.unit{display:flex;flex-direction:column;gap:9px}
+.unithead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.unithead b{font-size:16px;font-weight:800}
+.unithead .sub{font-size:12px;color:var(--muted);font-weight:700}
+.unithead .rowx{margin-inline-start:auto}
+.idfs{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,196px),1fr));align-items:start}
+.idf{background:var(--card2);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px;display:flex;flex-direction:column;gap:8px}
+.idf.down{border:1.5px dashed var(--warn);background:var(--band)}
+.idfhead{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);min-height:22px}
+.idfhead span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idfhead .n{margin-inline-start:auto;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.04em;white-space:nowrap}
+.idfhead .chip{margin-inline-start:auto}
+.rooms{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.room{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px 9px;border-radius:10px;background:var(--card);position:relative;min-width:0;box-shadow:0 1px 0 var(--line)}
+.room .rn{border:0;background:none;color:inherit;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;line-height:1;max-width:100%;padding:2px 6px;border-radius:6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.room .rn:hover{background:var(--line)}
+.room.sel{outline:2.5px solid var(--ink);outline-offset:1px}
+.pips{display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
+.pip{width:16px;height:16px;border-radius:4px;background:var(--hero);border:0;padding:0;cursor:pointer;flex:none}
+.pip:hover{filter:brightness(1.08)}
+.pip.late{background:transparent;box-shadow:inset 0 0 0 2px var(--blue)}
+.pip.deg{background:var(--gold)}
+.pip.off{background:var(--warn)}
+.pip.unk,.pip.paused{background:var(--line)}
+.pip.cur{box-shadow:0 0 0 1.5px var(--card),0 0 0 3px var(--ink)}
+.pip.late.cur{box-shadow:inset 0 0 0 2px var(--blue),0 0 0 1.5px var(--card),0 0 0 3px var(--ink)}
+.pip.busy{animation:blink 1s ease-in-out infinite}
+.pip.beat{animation:beat .7s ease-out}
+@keyframes beat{0%{transform:scale(1)}30%{transform:scale(1.5)}100%{transform:scale(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:11.5px;font-weight:700;color:var(--muted);border-top:1px solid var(--line);padding-block:12px 0}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.chart{display:flex;flex-direction:column;gap:6px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.xl{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted)}
+.ax{fill:var(--muted);font:700 11px var(--font)}
+.gridl{stroke:var(--line);stroke-width:1}
+.gridl.top{stroke-dasharray:4 4}
+.area{fill:var(--hero);opacity:.13}
+.fline{fill:none;stroke:var(--hero-deep);stroke-width:2.2;stroke-linejoin:round}
+.endpt{fill:var(--card);stroke:var(--hero-deep);stroke-width:2.5}
+.endv{fill:var(--ink);font:800 12px var(--font)}
+.ann{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:3 3}
+.annt{fill:var(--bad-ink);font:800 10.5px var(--font)}
+.trace{fill:none;stroke-width:2;stroke-linejoin:round}
+.trace.ok{stroke:var(--hero)}.trace.late{stroke:var(--blue)}.trace.deg{stroke:var(--deg-line)}.trace.off{stroke:var(--warn)}.trace.unk{stroke:var(--muted2)}
+.bl{stroke:var(--line);stroke-width:1}
+.nodata{stroke:var(--line);stroke-width:2;stroke-dasharray:3 4}
+.miss{fill:var(--band)}
+.rst{fill:var(--gold);stroke:var(--card);stroke-width:1.5}
+.flt{fill:var(--gold)}
+
+/* device panel */
+.dtop{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 16px}
+.room-n{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.status{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;font-weight:800;font-size:14px;white-space:nowrap}
+.status .ic{width:18px;height:18px;stroke-width:2.6}
+.s-ok{background:var(--fill-ok);color:var(--fill-ok-ink)}.s-late{background:var(--fill-info);color:var(--fill-info-ink)}.s-deg{background:var(--fill-cau);color:var(--fill-cau-ink)}.s-off{background:var(--fill-bad);color:var(--fill-bad-ink)}.s-unk{background:var(--pill);color:var(--muted)}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;border-radius:16px;background:var(--pill)}
+.tab{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:4px 6px;border:0;border-radius:12px;background:transparent;color:var(--muted);font-weight:800;font-size:12px;cursor:pointer;min-width:0}
+.tab span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+.fact{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fact .k{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.fact .v{font-family:var(--mono);font-size:12.5px;font-weight:500;overflow-wrap:anywhere}
+.sect{display:flex;flex-direction:column;gap:10px}
+.sh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sh .rowx{margin-inline-start:auto}
+.chain{display:flex;flex-direction:column}
+.layer{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:4px 12px;align-items:start;padding:9px 0}
+.layer+.layer{border-top:1px solid var(--line)}
+.lt{width:30px;height:30px;border-radius:9px;display:grid;place-items:center}
+.lt .ic{width:16px;height:16px;stroke-width:2.8}
+.l-pass .lt{background:var(--ok-tint);color:var(--ok-ink)}
+.l-warn .lt{background:var(--fill-cau);color:var(--fill-cau-ink)}
+.l-fail .lt{background:var(--fill-bad);color:var(--fill-bad-ink)}
+.l-skip .lt{background:var(--pill);color:var(--muted2)}
+.ln{font-weight:800;font-size:13.5px}
+.ev{font-size:12.5px;color:var(--muted);line-height:1.45;font-weight:600}
+.l-fail .ev,.l-warn .ev{color:var(--ink)}
+.l-skip .ln{color:var(--muted)}
+.lm{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:end;white-space:nowrap;padding-top:2px}
+.l-fail .lm{color:var(--bad-ink);font-weight:700}
+.read{border-radius:var(--r-sm);padding:14px 16px;background:var(--card2);border:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+.read h3{font-size:17px;font-weight:800;line-height:1.3;text-wrap:balance}
+.read p{font-size:13px;line-height:1.55;color:var(--muted);font-weight:600}
+.ai{border-radius:var(--r-sm);padding:14px 16px;background:var(--ai-tint);display:flex;flex-direction:column;gap:11px}
+.ai-h{display:flex;align-items:center;gap:8px;color:var(--ai-ink)}
+.ai-h .eyebrow{color:inherit}
+.ai-note{font-size:12.5px;line-height:1.5;color:var(--ink);font-weight:600;opacity:.8}
+.ai h3{font-size:17px;font-weight:800;line-height:1.3}
+.ai p{font-size:13px;line-height:1.55;font-weight:600}
+.steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.45;font-weight:600}
+.steps .swho{display:inline-block;margin-inline-start:6px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ai-ink)}
+::placeholder{color:var(--muted2);opacity:1}
+.draft{background:var(--card);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:9px;font-size:13px;line-height:1.5}
+.think{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--ai-ink)}
+.dots{display:inline-flex;gap:4px}
+.dots i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:blink 1.1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.18s}.dots i:nth-child(3){animation-delay:.36s}
+.ask{display:flex;gap:8px}
+.ask input{flex:1;min-width:0;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:13px;font-weight:600}
+.qa{display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.5}
+.qa .q{font-weight:800}.qa .a{font-weight:600;white-space:pre-wrap}
+
+/* remote console */
+.con{border-radius:var(--r-sm);padding:14px;background:var(--card2);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.conhead{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.conhead .tgt{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted)}
+.sub-h{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.looks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.looks .btn{min-height:40px;border-radius:12px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);padding:0 10px;font-size:12.5px}
+.looks .btn.on{box-shadow:inset 0 0 0 2px var(--ink)}
+.btn.led{justify-content:flex-start}
+.btn.led .sw{width:13px;height:13px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.22);flex:none}
+.btn.led .sw.off{background:transparent;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.viewer{display:flex;flex-direction:column;gap:8px}
+.logs{margin:0;font-family:var(--mono);font-size:11px;line-height:1.55;background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:10px 12px;overflow:auto;white-space:pre;max-height:280px}
+.logs .e{color:var(--code-err)}.logs .w{color:var(--code-warn)}.logs .d{color:var(--code-dim)}
+.kv{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:6px 14px;font-size:12.5px;margin:0}
+.kv dt{color:var(--muted);font-weight:700}
+.kv dd{margin:0;font-family:var(--mono);font-weight:500;overflow-wrap:anywhere}
+.acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.act{justify-content:flex-start;min-height:44px;padding:0 12px;border-radius:12px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);text-align:start}
+.act span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.act.b-ok{background:var(--fill-ok);color:var(--fill-ok-ink);box-shadow:none}
+.confirm{border-radius:12px;padding:12px 14px;background:var(--cau-tint);color:var(--cau-ink);display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5;font-weight:600}
+.confirm b{font-weight:800}
+.alog{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--code-bg);font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--code-dim);overflow-x:auto;max-height:260px;overflow-y:auto}
+.alog div{white-space:pre-wrap;overflow-wrap:anywhere}
+.alog .cmd{color:var(--code-ink)}
+.alog .fin{font-family:var(--font);font-size:12.5px;font-weight:700;color:#8FE3AE}
+.alog .fin.bad{color:var(--code-err)}
+.who{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:11px 12px;border-radius:12px;background:var(--card2);align-items:start}
+.who .to{font-weight:800;font-size:13px}
+.who .m{font-size:12.5px;color:var(--muted);line-height:1.45;font-weight:600;grid-column:1 / -1}
+.who .ws{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.who .ws .btn{min-height:32px;padding:0 12px;font-size:12px}
+.ack{font-size:11.5px;color:var(--muted);font-weight:700;text-align:end}
+.shot{background:var(--bezel);border-radius:14px;padding:6px;width:100%;max-width:440px;position:relative}
+.shot img{display:block;width:100%;border-radius:8px;background:#222;min-height:120px}
+.shot .wait{position:absolute;inset:6px;display:grid;place-items:center;color:#cfcac1;font-size:12px;font-weight:700}
+
+/* right column */
+.issues,.inbox{display:flex;flex-direction:column;gap:8px}
+.issue{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r-sm);border:0;background:var(--card2);cursor:pointer;text-align:start;width:100%}
+.issue .si{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none}
+.issue .si .ic{width:19px;height:19px}
+.sv-urgent .si{background:var(--fill-bad);color:var(--fill-bad-ink)}
+.sv-caution .si{background:var(--fill-cau);color:var(--fill-cau-ink)}
+.sv-fixed .si{background:var(--ok-tint);color:var(--ok-ink)}
+.sv-new .si{background:var(--fill-info);color:var(--fill-info-ink)}
+.sv-boot .si{background:var(--info-tint);color:var(--info-ink)}
+.sv-gone .si{background:var(--pill);color:var(--muted)}
+.issue .ib{display:flex;flex-direction:column;gap:2px;min-width:0}
+.issue .sl{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.issue .it{font-weight:800;font-size:13.5px;line-height:1.25}
+.issue .iw{font-size:12px;color:var(--muted);font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.issue .ia{margin-inline-start:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.issue .ow{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.issue.sel{outline:2.5px solid var(--ink)}
+.issue.done{opacity:.62}
+.feed{display:flex;flex-direction:column}
+.fi{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;padding:11px 0;border-top:1px solid var(--line)}
+.fi:first-child{border-top:0;padding-top:0}
+.fi .t{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted);padding-top:1px}
+.fi .b{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fi .to{font-weight:800;font-size:13px}
+.fi .m{font-size:12.5px;line-height:1.45;color:var(--muted);font-weight:600;overflow-wrap:anywhere}
+.fi.ev .m{color:var(--ink)}
+.rules,.steplist{display:flex;flex-direction:column}
+.rule{display:grid;grid-template-columns:28px minmax(0,1fr);gap:3px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.rule:first-child{border-top:0;padding-top:0}
+.rule .ri{grid-row:span 2;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--pill);color:var(--ink);font-size:12px;font-weight:800}
+.rule .ri .ic{width:15px;height:15px}
+.rule .if{font-weight:800;font-size:13px;line-height:1.3}
+.rule .then{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45}
+
+/* discovery */
+.tl{display:flex;flex-direction:column}
+.ts{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:2px 12px;padding:0 0 12px;position:relative}
+.ts::before{content:"";position:absolute;left:10px;top:22px;bottom:0;width:2px;background:var(--line)}
+.ts:last-child::before{display:none}
+.ts .dt{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--pill);color:var(--muted2);position:relative;z-index:1}
+.ts .dt .ic{width:12px;height:12px;stroke-width:3}
+.ts.done .dt{background:var(--fill-ok);color:var(--fill-ok-ink)}
+.ts.warn .dt{background:var(--fill-cau);color:var(--fill-cau-ink)}
+.ts.fail .dt{background:var(--fill-bad);color:var(--fill-bad-ink)}
+.ts.now .dt{background:var(--fill-info);color:var(--fill-info-ink);animation:blink 1s ease-in-out infinite}
+.ts .tn{font-weight:800;font-size:13px;line-height:1.3}
+.ts .td{grid-column:2;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;overflow-wrap:anywhere}
+.ts.fail .td,.ts.now .td{color:var(--ink)}
+.ts.pending .tn{color:var(--muted)}
+.ts .tt{font-size:11.5px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.claimgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:620px){.claimgrid{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.sugg{border-radius:var(--r-sm);padding:14px;background:var(--card2);border:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.sugg h3{font-size:18px;font-weight:800;line-height:1.25}
+.sugg p{font-size:12.5px;line-height:1.5;color:var(--muted);font-weight:600}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.fgrid .full{grid-column:1 / -1}
+.fld{display:flex;flex-direction:column;gap:5px}
+.warnbox{padding:10px 12px;border-radius:12px;background:var(--cau-tint);color:var(--cau-ink);font-size:12.5px;font-weight:700;line-height:1.45}
+.okbox{padding:10px 12px;border-radius:12px;background:var(--ok-tint);color:var(--ok-ink);font-size:12.5px;font-weight:700;line-height:1.45}
+.badbox{padding:10px 12px;border-radius:12px;background:var(--bad-tint);color:var(--bad-ink);font-size:12.5px;font-weight:700;line-height:1.45}
+/* the Android approval dialog, drawn so the tech knows what to look for */
+.phone{background:var(--bezel);border-radius:14px;padding:6px}
+.ascr{min-height:200px;padding:18px 0;border-radius:8px;background:#2a2d33;display:grid;place-items:center;position:relative;overflow:hidden}
+.adlg{background:#fff;color:#141414;border-radius:10px;width:82%;padding:14px 16px;display:flex;flex-direction:column;gap:8px;font-size:12px;line-height:1.4;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.adlg b{font-size:13.5px;font-weight:800}
+.adlg code{font-family:var(--mono);font-size:10.5px;word-break:break-all;color:#1F47B3;font-weight:700}
+.adlg .ck{display:flex;gap:6px;align-items:center;font-size:11px}
+.adlg .ck i{width:12px;height:12px;border-radius:3px;background:#0F7A33;display:inline-block}
+.adlg .bt{display:flex;justify-content:flex-end;gap:18px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1F47B3}
+
+/* dialogs and toasts */
+dialog{border:0;border-radius:var(--r);padding:22px;width:min(620px,calc(100vw - 32px));box-shadow:0 24px 64px rgba(20,20,20,.25);color:var(--ink);font-family:var(--font);font-weight:600}
+dialog::backdrop{background:rgba(20,20,20,.45)}
+dialog h2{margin:0 0 14px;font-size:20px;font-weight:800}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.dlg-actions .spacer{flex:1}
+.formerr{color:var(--bad-ink);font-weight:700;font-size:13px;min-height:18px;margin-top:8px;white-space:pre-line}
+.toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:50;width:min(400px,calc(100vw - 32px))}
+.toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-weight:600;font-size:13px;white-space:pre-line;box-shadow:0 10px 30px rgba(0,0,0,.2);animation:tin .2s ease-out}
+.toast.err{background:var(--fill-bad)}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style>html:not(.hci-remote-on) .navRemote{display:none!important}</style>
+<script>try{if(localStorage.getItem('hciRemoteOn'))document.documentElement.classList.add('hci-remote-on')}catch(e){}</script>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark"><svg class="ic" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+      <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
+    </div>
+    <nav class="nav" id="nav" aria-label="Views"></nav>
+    <div class="site"><div class="sitename" id="siteName"></div><div class="rowx" id="siteChips"></div></div>
+    <div class="stats" id="stats"></div>
+    <a class="iconbtn" id="btnManual" href="/manual#health" title="Manual" aria-label="Manual"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></a>
+    <button class="iconbtn" id="btnSettings" title="Settings and alerts" aria-label="Settings and alerts"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </header>
+
+  <main class="main" id="vHealth">
+    <section class="col" aria-label="Fleet">
+      <div class="card">
+        <div class="mh">Heartbeat wall <span class="n" id="wallCount"></span></div>
+        <div id="wall"></div>
+        <div class="legend">
+          <span class="k"><span class="pip"></span>Online</span>
+          <span class="k"><span class="pip late"></span>Late</span>
+          <span class="k"><span class="pip deg"></span>Degraded</span>
+          <span class="k"><span class="pip off"></span>Offline</span>
+          <span class="k"><span class="pip unk"></span>Checking or paused</span>
+          <span class="k">One square per board in the room</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="mh">Boards reporting · last 30 min <span class="n" id="fleetNow"></span></div>
+        <div class="chart"><div id="fleetChart"></div><div class="xl"><span>30 min ago</span><span>15 min</span><span>now</span></div></div>
+      </div>
+      <div class="card">
+        <div class="mh">Open issues <span class="n" id="issueCount"></span></div>
+        <div class="issues" id="issues"></div>
+      </div>
+    </section>
+
+    <section class="col" id="panel" aria-label="Selected board">
+      <div class="card" id="panelCard">
+        <div id="pHead"></div>
+        <div class="tabs" id="pTabs" role="tablist"></div>
+        <div class="facts" id="pFacts"></div>
+        <div class="sect">
+          <div class="sh"><span class="eyebrow">Heartbeat · every 30 s</span><span class="rowx" id="pEcgKey"></span></div>
+          <div class="chart"><div id="pEcg"></div><div class="xl"><span>30 min ago</span><span>15 min</span><span>now</span></div></div>
+        </div>
+        <div class="sect">
+          <div class="sh"><span class="eyebrow">Where it breaks · power up to the screen</span></div>
+          <div class="chain" id="pChain"></div>
+        </div>
+        <div class="read" id="pRead"></div>
+        <div class="ai" id="pAi"></div>
+        <div class="sect">
+          <div class="sh"><span class="eyebrow">Who gets told</span></div>
+          <div id="pTold" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="col" aria-label="Remote console">
+      <div class="card">
+        <div class="mh">Remote console · network ADB</div>
+        <div class="con" id="pCon"></div>
+      </div>
+    </section>
+  </main>
+
+  <main class="main adm" id="vAdmin" hidden>
+    <section class="col" aria-label="Who got told">
+      <div class="card">
+        <div class="mh">Who got told</div>
+        <div class="feed" id="feed"></div>
+      </div>
+    </section>
+    <section class="col" aria-label="Alert rules">
+      <div class="card">
+        <div class="mh">Alert rules <button class="btn" id="btnRules" style="margin-inline-start:auto;min-height:30px;padding:0 12px;font-size:11px">Change</button></div>
+        <div class="rules" id="rules"></div>
+      </div>
+    </section>
+  </main>
+
+  <main class="main disc" id="vNew" hidden>
+    <section class="col" aria-label="New devices">
+      <div class="card">
+        <div class="mh">Waiting to be claimed <span class="n" id="ndCount"></span></div>
+        <div class="inbox" id="ndList"></div>
+        <div class="rowx"><button class="btn b-info" id="btnSweep"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Find devices now</button><span class="note" id="sweepNote"></span></div>
+      </div>
+      <div class="card">
+        <div class="mh">Claimed</div>
+        <div class="inbox" id="ndDone"></div>
+        <button class="btn" id="btnHidden" hidden style="align-self:flex-start"></button>
+        <div class="inbox" id="ndHidden" hidden></div>
+      </div>
+    </section>
+    <section class="col" id="ndPanel" aria-label="Selected new device">
+      <div class="card" id="ndDetail"></div>
+    </section>
+    <section class="col col-side" aria-label="How discovery works">
+      <div class="card"><div class="mh">How a board is found</div><div class="steplist" id="howList"></div></div>
+      <div class="card"><div class="mh">Hospital IT sets up once</div><div class="steplist" id="itList"></div></div>
+      <div class="card"><div class="mh">Keeping it safe</div><div class="steplist" id="safeList"></div></div>
+    </section>
+  </main>
+</div>
+
+<!-- settings -->
+<dialog id="dlgSet">
+  <form id="formSet">
+    <h2>Settings and alerts</h2>
+    <div class="fgrid">
+      <label class="fld"><span class="eyebrow">Site name</span><input class="in" id="sSite" maxlength="60" placeholder="Riverside Medical Center"></label>
+      <label class="fld"><span class="eyebrow">HCI ONE server (optional)</span><input class="in" id="sServer" placeholder="10.40.0.5 or hcione.local" spellcheck="false"></label>
+      <label class="fld full"><span class="eyebrow">Teams link for HCI Support</span><input class="in" id="sTeamsHci" placeholder="https://… from Workflows: post to a channel when a webhook request is received" spellcheck="false" autocomplete="off"></label>
+      <label class="fld full"><span class="eyebrow">Teams link for Hospital IT (optional)</span><input class="in" id="sTeamsIt" placeholder="Blank sends Hospital IT alerts to the HCI Support channel" spellcheck="false" autocomplete="off"></label>
+      <label class="fld"><span class="eyebrow">Offline after (seconds)</span><input class="in" id="sOff" type="number" min="30" max="3600"></label>
+      <label class="fld"><span class="eyebrow">Escalate after (minutes)</span><input class="in" id="sEsc" type="number" min="1" max="240"></label>
+      <label class="fld"><span class="eyebrow">Clock off by more than (seconds)</span><input class="in" id="sClock" type="number" min="5" max="3600"></label>
+      <label class="fld"><span class="eyebrow">Look for new devices every (minutes, 0 is off)</span><input class="in" id="sSweep" type="number" min="0" max="1440"></label>
+      <label class="fld"><span class="eyebrow">Time server for Sync clock (optional)</span><input class="in" id="sNtp" placeholder="time.hospital.org" spellcheck="false"></label>
+      <label class="check" style="align-self:end"><input type="checkbox" id="sPop"> Pop up on this PC when an alert goes out</label>
+      <label class="fld full"><span class="eyebrow">Claude API key (optional, for Diagnose with Claude)</span><input class="in" id="sKey" placeholder="sk-ant-…" spellcheck="false" autocomplete="off"></label>
+      <label class="fld"><span class="eyebrow">Claude model</span><input class="in" id="sModel" spellcheck="false"></label>
+      <label class="check" style="align-self:end"><input type="checkbox" id="sLogs"> Include log lines I pulled. Logs can contain patient details, so this is off unless your agreement allows it.</label>
+      <label class="fld full"><span class="eyebrow">Door sign LED command ({color} and {mode} are filled in)</span><input class="in" id="sLed" placeholder="am broadcast -a com.hci.one.roomsign.SET_LED -n com.hci.one.roomsign/.SetLedReceiver --es color '{color}' --es mode '{mode}'" spellcheck="false" autocomplete="off"></label>
+    </div>
+    <div class="formerr" id="setErr"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="setTest">Send a test alert</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="setCancel">Cancel</button>
+      <button type="submit" class="btn b-dark">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- placement -->
+<dialog id="dlgEdit">
+  <form id="formEdit">
+    <h2 id="editTitle">Edit board</h2>
+    <div class="fgrid">
+      <label class="fld"><span class="eyebrow">Name</span><input class="in" id="eName" maxlength="60"></label>
+      <label class="fld"><span class="eyebrow">Type</span><select id="eKind"></select></label>
+      <label class="fld"><span class="eyebrow">Unit</span><input class="in" id="eUnit" maxlength="40" list="dlUnits" placeholder="4 West"></label>
+      <label class="fld"><span class="eyebrow">Closet (switch)</span><input class="in" id="eCloset" maxlength="40" list="dlClosets" placeholder="IDF 4A"></label>
+      <label class="fld"><span class="eyebrow">Room</span><input class="in" id="eRoom" maxlength="20" placeholder="412"></label>
+      <label class="fld"><span class="eyebrow">App to watch</span><input class="in" id="eApp" placeholder="com.hci.one.board" spellcheck="false"></label>
+      <div class="full rowx"><button type="button" class="btn" id="eUseFg">Use the app on screen now</button><span class="note" id="eFgNote"></span></div>
+    </div>
+    <div class="formerr" id="editErr"></div>
+    <div class="dlg-actions"><span class="spacer"></span><button type="button" class="btn" id="editCancel">Cancel</button><button type="submit" class="btn b-dark">Save</button></div>
+  </form>
+</dialog>
+<datalist id="dlUnits"></datalist><datalist id="dlClosets"></datalist>
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function () {
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+var clean = function (s) { return String(s == null ? '' : s).replace(/\s*[—–]\s*/g, ', ').replace(/\s-\s/g, ', ').replace(/(\w)-(?=\w)/g, '$1 '); };
+var clock = function (t) { return new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+var clockS = function (t) { return new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); };
+function dur(ms) { ms = Math.max(0, ms); var s = Math.floor(ms / 1000); if (s < 60) return s + ' s'; var m = Math.floor(s / 60); if (m < 60) return m + ' min'; var h = Math.floor(m / 60); if (h < 24) return h + ' h ' + (m % 60) + ' min'; return Math.floor(h / 24) + ' d'; }
+function mmss(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function listJoin(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+var CACHE = {};
+function html(id, h) { if (CACHE[id] !== h) { CACHE[id] = h; var el = $(id); if (el) el.innerHTML = h; } }
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var ICON = {
+  check: 'M20 6L9 17l-5-5', x: 'M18 6L6 18M6 6l12 12', minus: 'M5 12h14',
+  alert: 'M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01',
+  clock: 'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20M12 6v6l4 2',
+  refresh: 'M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15',
+  power: 'M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10',
+  plug: 'M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z',
+  sun: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  disk: 'M22 12H2M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1zM6 16h.01M10 16h.01',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8l1-1a5.5 5.5 0 0 0 0-7.8z',
+  server: 'M4 3h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM4 13h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zM7 7h.01M7 17h.01',
+  spark: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z',
+  send: 'M22 2L11 13M22 2l-7 20l-4-9l-9-4z',
+  lock: 'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM7 11V7a5 5 0 0 1 10 0v4',
+  msg: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  board: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  upload: 'M12 15V3M7 8l5-5 5 5M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4',
+  image: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8.5 7a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3M21 15l-5-5L5 21',
+  list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  info: 'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20M12 16v-4M12 8h.01',
+  wifi: 'M5 12.5a11 11 0 0 1 14 0M8.5 16a6 6 0 0 1 7 0M12 20h.01M1.4 9a16 16 0 0 1 21.2 0',
+  link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
+  usb: 'M12 2v14M8 6l4-4l4 4M7 12v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2M12 16v6',
+  map: 'M1 6v16l7-4l8 4l7-4V2l-7 4l-8-4zM8 2v16M16 6v16',
+  shield: 'M12 22s8-4 8-10V5l-8-3l-8 3v7c0 6 8 10 8 10z',
+  edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  copy: 'M9 9h12v12H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
+  eye: 'M1 12s4-8 11-8s11 8 11 8s-4 8-11 8s-11-8-11-8zM12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6',
+  key: 'M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8a5.5 5.5 0 0 1 7.8-7.8zM15.5 7.5l3 3L22 7l-3-3'
+};
+function ic(n, c) { return '<svg class="ic ' + (c || '') + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + (ICON[n] || ICON.info) + '"/></svg>'; }
+var ACT_IC = { restart: 'refresh', reboot: 'power', wake: 'sun', clock: 'clock', storage: 'disk', reconnect: 'link', keeper: 'shield' };
+var KORDER = ['wb', 'ds', 'tv', 'cam', 'tab', 'usb', 'other'];
+function kindOpts(cur) { return KORDER.filter(function (k) { return k !== 'other' || cur === 'other'; }).map(function (k) { return '<option value="' + k + '"' + (cur === k ? ' selected' : '') + '>' + (k === 'other' ? 'Not set' : D.kinds[k]) + '</option>'; }).join(''); }
+var PIP = { online: '', late: 'late', degraded: 'deg', offline: 'off', unknown: 'unk', paused: 'paused' };
+var RANK = { offline: 0, degraded: 1, late: 2, unknown: 3, online: 4, paused: 5 };
+
+/* ---------- api ---------- */
+function api(path, body) {
+  var init = { method: body === undefined ? 'GET' : 'POST', headers: { 'X-Board-Remote': '1' } };
+  if (body !== undefined) { init.body = JSON.stringify(body); init.headers['Content-Type'] = 'application/json'; }
+  return fetch(path, init).then(function (r) { return r.text().then(function (t) { var j; try { j = JSON.parse(t); } catch (e) { j = { ok: r.ok, message: t }; } if (j.ok === undefined) j.ok = r.ok; return j; }); })
+    .catch(function () { return { ok: false, message: 'Board Remote is not running. Double click START.bat.' }; });
+}
+function toast(msg, err) {
+  if (!msg) return;
+  var el = document.createElement('div'); el.className = 'toast' + (err ? ' err' : ''); el.textContent = msg;
+  $('toasts').appendChild(el); setTimeout(function () { el.remove(); }, err ? 8000 : 4000);
+}
+function report(j) { toast(j.message, !j.ok); return j; }
+
+/* ---------- state ---------- */
+var D = null, BY = {};
+var S = { view: location.hash === '#new' ? 'new' : location.hash === '#admin' ? 'admin' : 'health', sel: null, confirm: null, look: {}, nd: null, showHidden: false, aiBusy: {}, led: {} };
+try { var saved = localStorage.getItem('br.health.sel'); if (saved) S.sel = saved; } catch (e) { /* storage unavailable */ }
+var lastSlot = 0;
+function poll() {
+  return api('/api/health?sel=' + encodeURIComponent(S.sel || '')).then(function (j) {
+    if (!j || !j.boards) { html('wall', '<p class="note">' + esc(j && j.message || 'Board Remote is not running.') + '</p>'); return; }
+    D = j; BY = {}; D.boards.forEach(function (b) { BY[b.id] = b; });
+    if (!S.sel || !BY[S.sel]) { var w = worst(D.boards); S.sel = w ? w.id : null; if (S.sel) return poll(); }
+    renderAll();
+    if (lastSlot && D.slotStart !== lastSlot) { var hb = $('hb'); if (hb && !reduce) { hb.classList.remove('go'); void hb.offsetWidth; hb.classList.add('go'); } }
+    lastSlot = D.slotStart;
+  });
+}
+function worst(list) { var best = null; list.forEach(function (b) { if (!best || RANK[b.health.state] < RANK[best.health.state]) best = b; }); return best; }
+function cur() { return S.sel ? BY[S.sel] : null; }
+function select(id) { S.sel = id; S.confirm = null; try { localStorage.setItem('br.health.sel', id); } catch (e) { /* ignore */ } CACHE = {}; poll(); }
+function counts(list) { var c = { online: 0, late: 0, degraded: 0, offline: 0, unknown: 0, paused: 0 }; list.forEach(function (b) { c[b.health.state]++; }); return c; }
+function subnet(h) { return /^\d+\.\d+\.\d+\.\d+$/.test(h) ? 'Network ' + h.split('.').slice(0, 3).join('.') + '.x' : 'Other'; }
+function closetOf(b) { return b.closet || subnet(b.host); }
+function roomKey(b) { return (b.unit || '') + '|' + closetOf(b) + '|' + (b.room || ('#' + b.id)); }
+function roomLabel(b) { return b.room || (b.kind === 'usb' ? 'USB' : '.' + b.host.split('.').pop()); }
+
+/* ---------- header ---------- */
+function renderNav() {
+  var w = D.found.filter(function (f) { return f.status === 'found' || f.status === 'claiming'; }).length;
+  html('nav', '<a href="/">' + ic('board', 'ic-xs') + 'Boards</a>'
+    + '<button class="' + (S.view === 'health' ? 'on' : '') + '" data-view="health">' + ic('heart', 'ic-xs') + 'Device health</button>'
+    + '<button class="' + (S.view === 'new' ? 'on' : '') + '" data-view="new">' + ic('plug', 'ic-xs') + 'New devices' + (w ? '<span class="cnt">' + w + '</span>' : '') + '</button>'
+    + '<button class="' + (S.view === 'admin' ? 'on' : '') + '" data-view="admin">' + ic('shield', 'ic-xs') + 'Admin</button>'
+    + '<a href="/deploy">' + ic('upload', 'ic-xs') + 'Deploy</a>'
+    + '<a href="/audit"><svg class="ic ic-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Audit</a>'
+    + '<a class="navRemote" href="/remote"><svg class="ic ic-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1"/></svg>Remote</a>');
+  var st = D.settings;
+  html('siteName', esc(st.site || 'Board Remote'));
+  html('siteChips', (st.hasTeams ? '<span class="chip c-ok" title="Teams alerts on">' + ic('msg') + 'Teams<span>&nbsp;alerts on</span></span>' : '<span class="chip c-cau" title="No Teams link yet">' + ic('msg') + 'Teams<span>&nbsp;not set</span></span>') + (st.hasClaude ? '<span class="chip c-ai" title="Claude on">' + ic('spark') + 'Claude</span>' : ''));
+}
+function renderStats() {
+  var c = counts(D.boards);
+  html('stats', '<span class="stat"><span class="pip"></span><span class="v">' + c.online + '</span><span class="l">Online</span></span>'
+    + '<span class="stat"><span class="pip late"></span><span class="v">' + c.late + '</span><span class="l">Late</span></span>'
+    + '<span class="stat"><span class="pip deg"></span><span class="v">' + c.degraded + '</span><span class="l">Degraded</span></span>'
+    + '<span class="stat"><span class="pip off"></span><span class="v">' + c.offline + '</span><span class="l">Offline</span></span>'
+    + '<span class="stat" title="Last heartbeat round ' + dur(D.now - D.slotStart) + ' ago"><span class="hb" id="hb">' + ic('heart', 'ic-xs') + '</span><span class="v num" style="font-size:13px">' + dur(D.now - D.slotStart) + '</span></span>');
+  html('wallCount', D.boards.length + ' board' + (D.boards.length === 1 ? '' : 's'));
+}
+
+/* ---------- health view ---------- */
+function renderWall() {
+  if (!D.boards.length) { html('wall', '<p class="note">No boards yet. Add them on the Boards view, or claim them under New devices.</p>'); return; }
+  var units = {}, order = [];
+  D.boards.forEach(function (b) { var u = b.unit || 'Not placed yet'; if (!units[u]) { units[u] = []; order.push(u); } units[u].push(b); });
+  order.sort(function (a, b) { return a === 'Not placed yet' ? 1 : b === 'Not placed yet' ? -1 : a.localeCompare(b, undefined, { numeric: true }); });
+  var h = '';
+  order.forEach(function (u) {
+    var list = units[u], c = counts(list);
+    h += '<div class="unit"><div class="unithead"><b>' + esc(u) + '</b><span class="sub">' + list.length + ' board' + (list.length > 1 ? 's' : '') + '</span><span class="rowx">'
+      + (c.offline ? '<span class="chip c-bad">' + c.offline + ' offline</span>' : '') + (c.degraded ? '<span class="chip c-cau">' + c.degraded + ' degraded</span>' : '') + (c.late ? '<span class="chip c-info">' + c.late + ' late</span>' : '')
+      + (!c.offline && !c.degraded && !c.late ? '<span class="chip c-ok">' + ic('check') + 'All reporting</span>' : '') + '</span></div><div class="idfs">';
+    var cls = {}, corder = [];
+    list.forEach(function (b) { var k = closetOf(b); if (!cls[k]) { cls[k] = []; corder.push(k); } cls[k].push(b); });
+    corder.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+    corder.forEach(function (k) {
+      var gd = cls[k], watched = gd.filter(function (b) { return b.health.state !== 'paused'; });
+      var up = watched.filter(function (b) { return b.health.state !== 'offline'; }).length, down = watched.length >= 3 && up === 0;
+      h += '<div class="idf' + (down ? ' down' : '') + '"><div class="idfhead">' + ic('server', 'ic-xs') + '<span>' + esc(k) + '</span>' + (down ? '<span class="chip c-bad">Not answering</span>' : '<span class="n">' + up + ' of ' + watched.length + '</span>') + '</div><div class="rooms">';
+      var rooms = {}, rorder = [];
+      gd.forEach(function (b) { var rk = roomKey(b); if (!rooms[rk]) { rooms[rk] = []; rorder.push(rk); } rooms[rk].push(b); });
+      rorder.sort(function (a, b) { return a.split('|')[2].localeCompare(b.split('|')[2], undefined, { numeric: true }); });
+      rorder.forEach(function (rk) {
+        var bs = rooms[rk].slice().sort(function (a, b) { return KORDER.indexOf(a.kind) - KORDER.indexOf(b.kind); });
+        var isSel = bs.some(function (b) { return b.id === S.sel; });
+        var bad = bs.filter(function (b) { return b.health.state !== 'online'; }).length;
+        h += '<div class="room' + (isSel ? ' sel' : '') + '" role="group" aria-label="' + esc((bs[0].room ? 'Room ' + bs[0].room : bs[0].name) + (bad ? ', ' + bad + ' need attention' : ', all healthy')) + '">'
+          + '<button class="rn" data-room="' + esc(rk) + '" title="' + esc(bs.map(function (b) { return b.name + ': ' + b.health.headline; }).join('\n')) + '">' + esc(roomLabel(bs[0])) + '</button><span class="pips">'
+          + bs.map(function (b) { return '<button class="pip ' + PIP[b.health.state] + (b.health.busy ? ' busy' : '') + (b.id === S.sel ? ' cur' : '') + '" data-pick="' + b.id + '" title="' + esc(b.name + ': ' + b.health.headline) + '" aria-label="' + esc(b.name + ': ' + b.health.headline) + '"></button>'; }).join('') + '</span></div>';
+      });
+      h += '</div></div>';
+    });
+    h += '</div></div>';
+  });
+  html('wall', h);
+}
+function renderFleet() {
+  var el = $('fleetChart'); if (!el || S.view !== 'health') return;
+  var W = Math.max(280, Math.round(el.clientWidth || 460)), H = 120, L = 30, R = 34, TP = 16, B = 8, N = D.slots;
+  var watched = D.boards.filter(function (b) { return b.health.state !== 'paused'; });
+  var total = Math.max(1, watched.length);
+  var cnt = []; for (var i = 0; i < N; i++) { var c = 0; watched.forEach(function (b) { var x = b.health.beats[i]; if (x >= 1) c++; }); cnt.push(c); }
+  var has = []; for (i = 0; i < N; i++) has.push(watched.some(function (b) { return b.health.beats[i] !== -1; }));
+  var X = function (i) { return L + i * (W - L - R) / (N - 1); }, Y = function (v) { return TP + (1 - v / total) * (H - TP - B); };
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Boards reporting over the last 30 minutes, now ' + cnt[N - 1] + ' of ' + total + '">';
+  [0, total].forEach(function (v) { var y = Y(v).toFixed(1); s += '<line class="gridl' + (v === total ? ' top' : '') + '" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text class="ax" x="' + (L - 6) + '" y="' + (+y + 4) + '" text-anchor="end">' + v + '</text>'; });
+  var line = '', area = '', started = false, first = 0;
+  for (i = 0; i < N; i++) { if (!has[i]) continue; var p = X(i).toFixed(1) + ' ' + Y(cnt[i]).toFixed(1); if (!started) { started = true; first = i; line = 'M' + p; area = 'M' + X(i).toFixed(1) + ' ' + Y(0).toFixed(1) + ' L' + p; } else { line += ' L' + p; area += ' L' + p; } }
+  D.issues.forEach(function (iss) {
+    if (iss.kind !== 'group') return;
+    var ai = Math.round(N - 1 - (D.slotStart - iss.openedAt) / D.beatMs);
+    if (ai < 0 || ai >= N) return;
+    var ax = X(ai).toFixed(1);
+    var right = +ax > W - 120;
+    s += '<line class="ann" x1="' + ax + '" x2="' + ax + '" y1="' + (TP - 4) + '" y2="' + (H - B) + '"/><text class="annt" x="' + (right ? +ax - 5 : +ax + 5) + '" y="' + (TP + 2) + '" text-anchor="' + (right ? 'end' : 'start') + '">' + esc(iss.title.replace(/ not answering$/, ' down')) + '</text>';
+  });
+  if (started) {
+    area += ' L' + X(N - 1).toFixed(1) + ' ' + Y(0).toFixed(1) + ' Z';
+    s += '<path class="area" d="' + area + '"/><path class="fline" d="' + line + '"/>';
+    var ex = X(N - 1), ey = Y(cnt[N - 1]);
+    s += '<circle class="endpt" cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="4.5"/><text class="endv" x="' + (ex + 8).toFixed(1) + '" y="' + (ey + 4).toFixed(1) + '">' + cnt[N - 1] + '</text>';
+  } else s += '<text class="ax" x="' + (W / 2) + '" y="' + (H / 2) + '" text-anchor="middle">History builds up as heartbeats arrive</text>';
+  html('fleetChart', s + '</svg>');
+  html('fleetNow', cnt[N - 1] + ' of ' + total + ' now');
+}
+function ecg(b) {
+  var el = $('pEcg'); var W = Math.max(280, Math.round((el && el.clientWidth) || 420)), H = 92, base = 52, N = b.health.beats.length, sw = W / N;
+  var p = '', bands = '', marks = '', flt = '', nod = '', pen = false;
+  b.health.beats.forEach(function (c, i) {
+    var x = i * sw;
+    if (c === -1) { nod += '<line class="nodata" x1="' + x.toFixed(1) + '" x2="' + (x + sw).toFixed(1) + '" y1="' + base + '" y2="' + base + '"/>'; pen = false; return; }
+    if (!pen) { p += ' M' + x.toFixed(1) + ' ' + base; pen = true; }
+    if (c === 0) { bands += '<rect class="miss" x="' + x.toFixed(1) + '" y="6" width="' + sw.toFixed(1) + '" height="72" rx="2"/>'; p += ' L' + (x + sw).toFixed(1) + ' ' + base; return; }
+    var k = sw / 10;
+    p += ' L' + (x + 3 * k).toFixed(1) + ' ' + base + ' L' + (x + 4 * k).toFixed(1) + ' ' + (base + 5) + ' L' + (x + 5 * k).toFixed(1) + ' ' + (base - 36) + ' L' + (x + 6.2 * k).toFixed(1) + ' ' + (base + 13) + ' L' + (x + 7.2 * k).toFixed(1) + ' ' + base + ' L' + (x + sw).toFixed(1) + ' ' + base;
+    if (c === 2) marks += '<circle class="rst" cx="' + (x + 5 * k).toFixed(1) + '" cy="8" r="3.5"/>';
+    if (c === 3) flt += '<rect class="flt" x="' + x.toFixed(1) + '" y="84" width="' + (sw + 0.5).toFixed(1) + '" height="4"/>';
+  });
+  var cls = { online: 'ok', late: 'late', degraded: 'deg', offline: 'off', unknown: 'unk', paused: 'unk' }[b.health.state];
+  var got = b.health.beats.filter(function (c) { return c >= 1; }).length, known = b.health.beats.filter(function (c) { return c !== -1; }).length;
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Heartbeat trace, ' + got + ' of ' + known + ' beats received">' + bands + '<line class="bl" x1="0" x2="' + W + '" y1="' + base + '" y2="' + base + '"/>' + nod + flt + (p ? '<path class="trace ' + cls + '" d="' + p + '"/>' : '') + marks + '</svg>';
+}
+function statusBlock(h) {
+  var t = D.now;
+  var st = { online: ['s-ok', 'check', 'Online'], late: ['s-late', 'clock', 'Late · beat missed'], degraded: ['s-deg', 'alert', 'Degraded'], offline: ['s-off', 'x', 'Offline'], unknown: ['s-unk', 'clock', 'Checking'], paused: ['s-unk', 'minus', 'Paused'] }[h.state];
+  return '<span class="status ' + st[0] + '">' + ic(st[1]) + st[2] + (h.state === 'online' || h.state === 'unknown' || h.state === 'paused' ? '' : ' · ' + dur(t - h.since)) + '</span>';
+}
+function renderPanel() {
+  if (S.view !== 'health') return;
+  var b = cur();
+  if (!b) { $('panelCard').innerHTML = '<p class="note">No boards yet.</p>'; html('pCon', '<p class="note">Pick a board to use the console, pull logs or save a snapshot.</p>'); return; }
+  var h = b.health, t = D.now;
+  if (!h.chain) return;  // details arrive on the next poll
+  html('pHead', '<div class="dtop"><div><div class="eyebrow">' + esc([b.unit, b.closet || subnet(b.host), D.kinds[b.kind] || 'Device'].filter(Boolean).join(' · ')) + '</div><div class="room-n">' + esc(b.name) + '</div></div><div class="rowx">'
+    + '<button class="btn" data-edit="' + b.id + '" style="min-height:36px">' + ic('edit') + 'Edit</button>' + statusBlock(h) + '</div></div>');
+  var mates = D.boards.filter(function (x) { return roomKey(x) === roomKey(b); }).sort(function (a, c) { return KORDER.indexOf(a.kind) - KORDER.indexOf(c.kind); });
+  $('pTabs').hidden = mates.length < 2;
+  html('pTabs', mates.map(function (x) { return '<button class="tab' + (x.id === b.id ? ' on' : '') + '" role="tab" aria-selected="' + (x.id === b.id) + '" data-sel="' + x.id + '"><span class="pip ' + PIP[x.health.state] + '"></span><span>' + esc(D.kinds[x.kind] || x.name) + '</span></button>'; }).join(''));
+  var f = h.facts || {};
+  html('pFacts', [
+    ['Model', [b.make, b.model].filter(Boolean).join(' ') || 'Unknown yet'], ['App watched', b.app || 'Not set'], ['Address', b.serial],
+    ['Android', b.android || '?'], ['On screen', f.fgPkg || '?'], ['Last heartbeat', h.lastBeat ? dur(t - h.lastBeat) + ' ago' : 'None yet']
+  ].map(function (x) { return '<div class="fact"><span class="k">' + x[0] + '</span><span class="v">' + esc(x[1]) + '</span></div>'; }).join(''));
+  var beats = h.beats, miss = beats.indexOf(0) >= 0, rs = beats.indexOf(2) >= 0, fl = beats.indexOf(3) >= 0;
+  var got = beats.filter(function (c) { return c >= 1; }).length, known = beats.filter(function (c) { return c !== -1; }).length;
+  html('pEcgKey', (miss ? '<span class="chip c-bad">Missed</span>' : '') + (rs ? '<span class="chip c-cau">Restart or crash</span>' : '') + (fl ? '<span class="chip c-cau">Fault reported</span>' : '') + (!miss && !rs && !fl && known ? '<span class="chip c-ok">' + ic('check') + got + ' of ' + known + '</span>' : ''));
+  html('pEcg', ecg(b));
+  var LI = { pass: 'check', warn: 'alert', fail: 'x', skip: 'minus' };
+  html('pChain', h.chain.map(function (c) { return '<div class="layer l-' + c[0] + '"><span class="lt">' + ic(LI[c[0]]) + '</span><div><div class="ln">' + esc(c[1]) + '</div><div class="ev">' + esc(c[2]) + '</div></div><span class="lm">' + esc(c[3]) + '</span></div>'; }).join(''));
+  var rd = h.read;
+  html('pRead', '<span class="eyebrow">First read from the check chain</span><h3>' + esc(rd.headline) + '</h3><p>' + esc(rd.detail) + '</p>'
+    + (rd.owner.length || rd.fixNote ? '<div class="rowx">' + rd.owner.map(function (o) { return '<span class="chip ' + (o === 'HCI' ? 'c-ok' : 'c-info') + '">' + ic(o === 'HCI' ? 'board' : 'server') + esc(o) + '</span>'; }).join('')
+      + (rd.fixNote ? '<span class="chip ' + (rd.fix ? 'c-ok' : 'c-cau') + '">' + (rd.fix ? 'Remote fix available' : 'No remote fix') + '</span>' : '') + (rd.conf ? '<span class="chip">' + rd.conf + ' confidence</span>' : '') + '</div>' : '')
+    + (rd.fixNote ? '<p style="color:var(--ink)">' + esc(rd.fixNote) + '</p>' : ''));
+  renderAi(b); renderCon(b); renderTold(b);
+}
+
+function renderAi(b) {
+  if (document.activeElement && document.activeElement.id === 'askIn') return;   // never redraw under someone typing
+  var A = b.health.ai, st = D.settings, h = '<div class="ai-h">' + ic('spark') + '<span class="eyebrow">Claude diagnosis</span></div>';
+  var busy = S.aiBusy[b.id];
+  if (!st.hasClaude) {
+    h += '<p class="ai-note">Claude reads this board’s heartbeat, check chain and its closet neighbors, then names a root cause, an owner, the steps and an alert ready to send. Add a Claude API key in Settings to run it here, or copy the evidence into a Claude chat.</p>'
+      + '<div class="rowx"><button class="btn b-ai" data-copyev="1">' + ic('copy') + 'Copy evidence for Claude</button><button class="btn" data-settings="1">' + ic('key') + 'Add API key</button></div>';
+  } else if (busy || (A && A.st === 'run')) {
+    h += '<div class="think"><span class="dots"><i></i><i></i><i></i></span>Reading the evidence</div>';
+  } else if (!A) {
+    h += '<p class="ai-note">Sends this board’s heartbeat, check chain and closet neighbors to Claude' + (st.claudeLogs ? ', plus any log lines you pulled,' : ' (never screenshots, and logs only if you allow it in Settings)') + ' for a root cause, an owner, the steps and an alert ready to send.</p><div class="rowx"><button class="btn b-ai" data-ai="1">' + ic('spark') + 'Diagnose with Claude</button></div>';
+  } else if (A.st === 'err') {
+    h += '<p class="ai-note">' + esc(A.err) + '</p><div class="rowx"><button class="btn b-ai" data-ai="1">' + ic('spark') + 'Try again</button></div>';
+  } else {
+    var r = A.res;
+    h += '<h3>' + esc(clean(r.headline)) + '</h3>' + (r.cause ? '<p>' + esc(clean(r.cause)) + '</p>' : '')
+      + '<div class="rowx">' + (r.owner && !/^none/i.test(r.owner) ? '<span class="chip c-ai">Owner: ' + esc(clean(r.owner)) + '</span>' : '') + (r.confidence ? '<span class="chip">' + esc(r.confidence) + ' confidence</span>' : '') + (r.layer && !/^none/i.test(r.layer) ? '<span class="chip">Layer: ' + esc(r.layer) + '</span>' : '') + '<span class="chip ' + (r.reset_will_fix ? 'c-ok' : 'c-cau') + '">' + (r.reset_will_fix ? 'A remote fix should solve it' : 'A remote fix will not solve it') + '</span></div>'
+      + (r.steps.length ? '<ol class="steps">' + r.steps.map(function (x) { return '<li>' + esc(clean(x.do)) + (x.who ? '<span class="swho">' + esc(clean(x.who)) + '</span>' : '') + '</li>'; }).join('') + '</ol>' : '')
+      + (r.alert ? '<div class="draft"><span class="eyebrow">Alert draft</span><div>' + esc(clean(r.alert)) + '</div><div class="rowx"><button class="btn b-ai" data-sendai="1"' + (A.sent ? ' disabled' : '') + '>' + ic('send') + (A.sent ? 'Sent' : 'Send to owners') + '</button><button class="btn" data-ai="1">' + ic('refresh') + 'Run again</button></div></div>' : '<div class="rowx"><button class="btn" data-ai="1">' + ic('refresh') + 'Run again</button></div>');
+    (A.chat || []).forEach(function (c) { h += '<div class="qa"><span class="q">' + esc(c.q) + '</span><span class="a">' + (c.st === 'run' ? 'Thinking…' : esc(clean(c.a))) + '</span>' + (c.err ? '<span class="note">' + esc(c.err) + '</span>' : '') + '</div>'; });
+    h += '<form class="ask" id="askForm"><input id="askIn" type="text" autocomplete="off" placeholder="Ask about this board" aria-label="Ask Claude about this board"><button class="btn b-ai" type="submit"' + (S.askBusy === b.id ? ' disabled' : '') + '>Ask</button></form>';
+  }
+  html('pAi', h);
+}
+
+function renderCon(b) {
+  var h = b.health, L = S.look[b.id] || {}, up = b.status === 'online' && (h.state === 'online' || h.state === 'degraded' || h.state === 'late');
+  var c = '<div class="conhead">' + (up ? '<span class="chip c-ok">' + ic('link') + 'Connected</span>' : '<span class="chip c-bad">' + ic('x') + 'Not reachable</span>')
+    + '<span class="tgt">' + esc(b.serial) + '</span><span class="chip">' + ic('lock') + 'This PC’s key only</span>' + (h.keeper ? '<span class="chip c-ok">' + ic('shield') + 'Keeper on</span>' : '') + '</div>';
+  if (!up) c += '<p class="note">' + esc(h.read.headline) + ' Looks and fixes come back when it answers again.</p>';
+  c += '<span class="sub-h">Look</span><div class="looks">' + [['screen', 'image', 'See the screen'], ['logs', 'list', 'Recent logs'], ['adv', 'clock', 'Log history'], ['info', 'info', 'Device info']].map(function (x) {
+    return '<button class="btn' + (L.view === x[0] ? ' on' : '') + '" data-look="' + x[0] + '"' + (up ? '' : ' disabled') + '>' + ic(x[1]) + x[2] + '</button>'; }).join('')
+    + '<button class="btn" data-snapone="1"' + (up ? '' : ' disabled') + '>' + ic('image') + 'Save snapshot</button></div>';
+  if (b.kind === 'ds') {
+    var lm = S.led[b.id] || 'solid';
+    var lcols = [['off', 'Off', 'transparent'], ['white', 'White', '#ffffff'], ['red', 'Red', '#e5484d'], ['amber', 'Amber', '#f5a623'], ['green', 'Green', '#30a46c'], ['blue', 'Blue', '#3b82f6']];
+    c += '<span class="sub-h">LED bezel</span>';
+    c += '<div class="looks" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:8px">'
+      + [['solid', 'Solid'], ['flash', 'Flash']].map(function (x) { return '<button class="btn' + (lm === x[0] ? ' on' : '') + '" data-ledmode="' + x[0] + '">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
+    c += '<div class="looks">' + lcols.map(function (x) {
+      return '<button class="btn led" data-led="' + x[0] + '"' + (up ? '' : ' disabled') + '><span class="sw' + (x[0] === 'off' ? ' off' : '') + '"' + (x[0] === 'off' ? '' : ' style="background:' + x[2] + '"') + '></span>' + esc(x[1]) + '</button>';
+    }).join('') + '</div>';
+    c += '<p class="note">Door signs only. Sends the LED command set under the gear to this board.</p>';
+  }
+  if (L.view === 'adv') c += advViewer(b);
+  else if (L.loading) c += '<div class="think" style="color:var(--muted)"><span class="dots"><i></i><i></i><i></i></span>' + ({ screen: 'Capturing the screen', logs: 'Pulling the last 200 log lines', info: 'Reading device properties' }[L.loading]) + '</div>';
+  else if (L.view && L.data) {
+    var d = L.data;
+    c += '<div class="viewer"><div class="sh"><span class="sub-h">' + ({ screen: 'Screen', logs: 'Last log lines', info: 'Device' }[L.view]) + ' · captured ' + clockS(d.at) + '</span>' + (L.view === 'screen' ? '<span class="rowx"><a class="btn" style="min-height:32px;font-size:12px" href="/?open=' + b.id + '">' + ic('eye') + 'Open live view</a></span>' : '') + '</div>';
+    if (L.view === 'screen') c += '<div class="shot"><img alt="Screen of ' + esc(b.name) + '" src="' + d.url + '"></div>';
+    if (L.view === 'logs') c += '<pre class="logs">' + d.lines.map(function (l) { return '<span class="' + (l.lv === 'E' || l.lv === 'F' ? 'e' : l.lv === 'W' ? 'w' : 'd') + '">' + esc(l.text) + '</span>'; }).join('\n') + '</pre>';
+    if (L.view === 'info') c += '<dl class="kv">' + d.rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>';
+    c += '<pre class="alog"><span class="cmd">$ ' + esc(d.cmd) + '</span></pre></div>';
+  }
+  var rec = h.read.fix, why = [];
+  c += '<span class="sub-h">Fix</span><div class="acts">';
+  h.actions.forEach(function (a) {
+    if (a.block && why.indexOf(a.block) < 0) why.push(a.block);
+    c += '<button class="btn act' + (rec === a.key && !a.block ? ' b-ok' : '') + '" data-act="' + a.key + '"' + (a.block ? ' disabled' : '') + ' title="' + esc(a.note) + '">' + ic(ACT_IC[a.key] || 'refresh') + '<span>' + esc(a.label) + '</span></button>';
+  });
+  c += '</div>';
+  if (why.length) c += '<p class="note">' + esc(why.join(' ')) + '</p>';
+  c += '<p class="note">Cycling the switch port (PoE) needs switch access, which Board Remote does not have yet.</p>';
+  if (S.confirm && S.confirm.id === b.id) {
+    var A = h.actions.filter(function (x) { return x.key === S.confirm.act; })[0];
+    if (A) c += '<div class="confirm"><div><b>' + esc(A.label) + ' on ' + esc(b.name) + '?</b> ' + esc(A.note) + '</div><div class="rowx"><button class="btn b-ok" data-go="1">' + esc(A.label) + '</button><button class="btn" data-cancel="1">Cancel</button></div></div>';
+  }
+  if (h.log.length) c += '<div class="alog" aria-live="polite">' + h.log.map(function (l) { return '<div class="' + esc(l.cls) + '">' + esc(l.text) + '</div>'; }).join('') + '</div>';
+  html('pCon', c);
+}
+
+function noticeStatus(n, iss) {
+  if (n.ack) return '<div class="ws"><span class="chip c-ok">' + ic('check') + 'Acknowledged</span><span class="ack">' + esc(n.ack.by) + ' · ' + clock(n.ack.at) + '</span></div>';
+  if (n.type === 'clear') return '<div class="ws"><span class="chip c-ok">All clear</span></div>';
+  if (iss && iss.resolvedAt) return '<div class="ws"><span class="chip c-ok">Fixed</span></div>';
+  var s = '<div class="ws">';
+  if (iss && iss.escalated) s += '<span class="chip c-bad">Escalated</span>';
+  else if (iss && iss.escAt && !iss.acked && n.type === 'alert') s += '<span class="chip c-cau num">Escalates in ' + mmss(iss.escAt - D.now) + '</span>';
+  else s += '<span class="chip">Waiting</span>';
+  return s + (n.type === 'alert' || n.type === 'escalation' ? '<button class="btn" data-ack="' + n.id + '">Mark acknowledged</button>' : '') + '</div>';
+}
+function chans(n) {
+  return '<div class="rowx">' + n.ch.map(function (c) { var d = n.delivery[c] || ''; var bad = /^failed/.test(d); return '<span class="chip ' + (bad ? 'c-bad' : d === 'sent' || d === 'shown' ? 'c-ok' : '') + '" title="' + esc(d) + '">' + ic(c === 'Teams' ? 'msg' : c === 'Pop up' ? 'bell' : 'board') + esc(c) + (bad ? ' failed' : d === 'sending' ? ' sending' : '') + '</span>'; }).join('') + '</div>';
+}
+function issueById(id) { return D.issues.filter(function (i) { return i.id === id; })[0]; }
+function renderTold(b) {
+  var iss = D.issues.filter(function (i) { return i.boards && i.boards.indexOf(b.id) >= 0; }).sort(function (a, c) { return (a.resolvedAt ? 1 : 0) - (c.resolvedAt ? 1 : 0) || c.openedAt - a.openedAt; })[0];
+  if (!iss) {
+    html('pTold', '<p class="note">Nothing open for this board. If it misses heartbeats for ' + D.settings.offlineSeconds + ' s, the owner the first read names hears first' + (D.settings.hasTeams ? ' in Teams' : '') + '. After ' + D.settings.escalateMinutes + ' min without an acknowledgement it escalates.</p>');
+    return;
+  }
+  var h = '<div class="rowx"><span class="chip ' + (iss.resolvedAt ? 'c-ok' : iss.sev === 'urgent' ? 'c-bad' : 'c-cau') + '">' + (iss.resolvedAt ? (iss.stopped ? 'Closed' : 'Fixed') : iss.sev === 'urgent' ? 'Urgent' : 'Caution') + '</span><span style="font-weight:800;font-size:13px">' + esc(iss.title) + '</span></div>';
+  var list = D.notices.filter(function (n) { return n.issue === iss.id; });
+  if (!list.length) h += '<p class="note">Nobody was told yet.</p>';
+  list.forEach(function (n) {
+    h += '<div class="who"><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><span class="to">' + esc(n.to) + ' <span class="muted num" style="font-weight:700;font-size:12px">· ' + clock(n.at) + (n.type === 'escalation' ? ' · escalation' : n.type === 'clear' ? ' · all clear' : '') + '</span></span>' + chans(n) + '</div>' + noticeStatus(n, iss) + '<div class="m">' + esc(n.msg) + '</div></div>';
+  });
+  html('pTold', h);
+}
+
+function renderSide() {
+  var t = D.now, open = D.issues.filter(function (i) { return !i.resolvedAt; }), done = D.issues.filter(function (i) { return i.resolvedAt && !i.stopped; }).slice(-6).reverse();
+  open.sort(function (a, b) { return (a.sev === 'urgent' ? 0 : 1) - (b.sev === 'urgent' ? 0 : 1) || a.openedAt - b.openedAt; });
+  var b = cur();
+  html('issueCount', open.length + ' open');
+  var item = function (i) {
+    var sv = i.resolvedAt ? 'fixed' : i.sev;
+    var sel = b && i.boards && i.boards.indexOf(b.id) >= 0;
+    return '<button class="issue sv-' + sv + (sel ? ' sel' : '') + (i.resolvedAt ? ' done' : '') + '" data-issue="' + i.id + '"><span class="si">' + ic(i.resolvedAt ? 'check' : i.sev === 'urgent' ? 'alert' : 'clock') + '</span><span class="ib"><span class="sl">' + (i.resolvedAt ? 'Fixed' : i.sev === 'urgent' ? 'Urgent' : 'Caution') + '</span><span class="it">' + esc(i.title) + '</span><span class="iw">' + esc(i.where) + '</span></span><span class="ia"><span>' + (i.resolvedAt ? clock(i.resolvedAt) : dur(t - i.openedAt)) + '</span><span class="ow">' + esc((i.owner || []).join(' and ')) + '</span></span></button>';
+  };
+  html('issues', open.map(item).join('') + done.map(item).join('') || '<p class="note">Nothing open. Every board is on its heartbeat.</p>');
+  var feed = [];
+  D.notices.forEach(function (n) { feed.push({ at: n.at, n: n }); });
+  D.events.forEach(function (e) { feed.push({ at: e.at, e: e }); });
+  feed.sort(function (a, c) { return c.at - a.at; });
+  html('feed', feed.slice(0, 18).map(function (f) {
+    if (f.e) return '<div class="fi ev"><span class="t">' + clock(f.at) + '</span><div class="b"><span class="m">' + esc(f.e.text) + '</span></div></div>';
+    var n = f.n, iss = issueById(n.issue);
+    return '<div class="fi"><span class="t">' + clock(f.at) + '</span><div class="b"><span class="to">' + esc(n.to) + '</span><span class="m" style="color:var(--ink)">' + esc(n.title) + '</span>' + chans(n) + '<span class="m">' + esc(n.msg) + '</span><div class="rowx">' + noticeStatus(n, iss).replace(/<div class="ws">|<\/div>$/g, '') + '</div></div></div>';
+  }).join('') || '<p class="note">Nothing sent yet.</p>');
+  html('rules', D.rules.map(function (r) { return '<div class="rule"><span class="ri">' + ic(r[0] === 'plug' ? 'plug' : r[0]) + '</span><span class="if">' + esc(r[1]) + '</span><span class="then">' + esc(r[2]) + '</span></div>'; }).join(''));
+}
+
+/* ---------- new devices view ---------- */
+var VIA = { network: ['Network sweep', 'wifi'], usb: ['USB', 'usb'], adb: ['Already connected', 'link'] };
+function fLabel(e) { return e.model ? [e.make, e.model].filter(Boolean).join(' ') : e.via === 'usb' ? 'Device on USB' : 'Android device'; }
+function fWhere(e) { return e.via === 'usb' ? 'USB · ' + (e.serial || '') : e.host + ':' + e.port; }
+function ndCard(e) {
+  var lab = { found: 'Waiting for claim', claiming: 'Claiming', claimed: 'Claimed', ignored: 'Hidden' }[e.status] || e.status;
+  var sv = e.status === 'claimed' ? 'fixed' : e.status === 'claiming' ? 'boot' : e.status === 'ignored' ? 'gone' : 'new';
+  var b = e.boardId && BY[e.boardId];
+  return '<button class="issue sv-' + sv + (e.id === S.nd ? ' sel' : '') + (e.status === 'claimed' ? ' done' : '') + '" data-nd="' + e.id + '"><span class="si">' + ic(VIA[e.via] ? VIA[e.via][1] : 'plug') + '</span><span class="ib"><span class="sl">' + lab + '</span><span class="it">' + esc(fLabel(e)) + '</span><span class="iw">' + esc(fWhere(e)) + (b ? ' · ' + esc(b.name) : e.error ? ' · ' + esc(e.error) : '') + '</span></span><span class="ia"><span>' + (e.status === 'claimed' && e.claimedAt ? clock(e.claimedAt) : dur(D.now - e.firstSeen)) + '</span><span class="ow">' + esc(VIA[e.via] ? VIA[e.via][0] : '') + '</span></span></button>';
+}
+function renderNew() {
+  if (S.view !== 'new') return;
+  var open = D.found.filter(function (e) { return e.status === 'found' || e.status === 'claiming'; });
+  var done = D.found.filter(function (e) { return e.status === 'claimed'; }).sort(function (a, b) { return (b.claimedAt || 0) - (a.claimedAt || 0); });
+  var hid = D.found.filter(function (e) { return e.status === 'ignored'; });
+  if (!S.nd || !D.found.some(function (e) { return e.id === S.nd; })) S.nd = (open[0] || done[0] || {}).id || null;
+  html('ndCount', open.length + ' waiting');
+  html('ndList', open.length ? open.map(ndCard).join('') : '<p class="note">Nothing waiting. Plug a board into this PC by USB, or power one up on the network with ADB on port 5555, and it shows up here.</p>');
+  html('ndDone', done.length ? done.map(ndCard).join('') : '<p class="note">Nothing claimed yet.</p>');
+  $('btnHidden').hidden = !hid.length; $('btnHidden').textContent = (S.showHidden ? 'Hide' : 'Show') + ' ' + hid.length + ' hidden';
+  $('ndHidden').hidden = !S.showHidden; html('ndHidden', hid.map(ndCard).join(''));
+  $('btnSweep').disabled = !!D.sweeping;
+  html('sweepNote', D.sweeping ? 'Looking now…' : (D.lastSweep ? 'Last look ' + dur(D.now - D.lastSweep) + ' ago. ' : '') + (D.settings.sweepMinutes > 0 ? 'Every ' + D.settings.sweepMinutes + ' min.' : 'Automatic look is off.'));
+  renderNdDetail();
+  html('howList', [
+    ['Look on the network', 'Every few minutes Board Remote checks this PC’s networks for anything answering ADB on port 5555. A board on USB, or one another tool already connected, shows up right away.'],
+    ['Ask the person at the board', 'Claiming connects to it. The board shows Allow USB debugging with this PC’s fingerprint. Nothing happens until someone there taps Allow.'],
+    ['Learn who it is', 'Model, serial, Android version and MAC come from the board itself.'],
+    ['Set it up', 'Board Remote installs the HCI ONE ADB keeper so network ADB survives reboots, checks the clock and notes the app on screen.'],
+    ['Watch it', 'It joins the heartbeat wall in its room and closet, or takes over the record of the board it replaces.']
+  ].map(function (s, i) { return '<div class="rule"><span class="ri">' + (i + 1) + '</span><span class="if">' + s[0] + '</span><span class="then">' + s[1] + '</span></div>'; }).join(''));
+  html('itList', [
+    ['server', 'A fixed address for each board', 'A DHCP reservation, so a board never moves to a new address.'],
+    ['link', 'Port 5555 open from this PC', 'Only from this PC to the device network. Nothing else needs it.'],
+    ['clock', 'A time server the boards can reach', 'NTP (UDP 123). Without it clocks drift and sign ins fail.'],
+    ['map', 'Units, closets and rooms', 'Enter them when you claim a board so a closet outage shows as one alert.']
+  ].map(function (s) { return '<div class="rule"><span class="ri">' + ic(s[0]) + '</span><span class="if">' + s[1] + '</span><span class="then">' + s[2] + '</span></div>'; }).join(''));
+  html('safeList', [
+    ['shield', 'A person approves every board', 'A device on a hospital port is never trusted on its own. Someone at the board taps Allow after checking the fingerprint.'],
+    ['lock', 'Only this PC’s key works', 'ADB on the board accepts the keys it has approved, and Board Remote only answers this PC.'],
+    ['list', 'Every command is logged', 'Fixes show the exact adb command and the result in the console and in the logs folder.']
+  ].map(function (s) { return '<div class="rule"><span class="ri">' + ic(s[0]) + '</span><span class="if">' + s[1] + '</span><span class="then">' + s[2] + '</span></div>'; }).join(''));
+}
+var STEP_NOTE = { connect: 'Opens network ADB to the device. A USB device is switched to network ADB first.', approve: 'The board asks the person there to allow this PC.', identify: 'Model, serial, Android and MAC.', keep: 'Installs the HCI ONE ADB keeper so network ADB stays on through reboots.', clock: 'Syncs it if it is off.', app: 'The app on screen becomes the app to watch.', place: 'Adds it, or takes over the board it replaces.', beat: 'It joins the heartbeat wall.' };
+function renderNdDetail() {
+  var e = D.found.filter(function (x) { return x.id === S.nd; })[0];
+  if (!e) { html('ndDetail', '<div class="mh">New device</div><p class="note">Pick a device on the left.</p>'); return; }
+  var stc = { found: ['c-info', 'Waiting for claim'], claiming: ['c-cau', 'Claiming'], claimed: ['c-ok', 'Claimed'], ignored: ['', 'Hidden'] }[e.status] || ['', e.status];
+  var via = VIA[e.via] || ['Found', 'plug'];
+  var h = '<div class="dtop"><div><div class="eyebrow">New device · found ' + clock(e.firstSeen) + '</div><div class="room-n" style="font-size:26px">' + esc(fLabel(e)) + '</div></div><div class="rowx"><span class="chip ' + stc[0] + '">' + stc[1] + '</span><span class="chip">' + ic(via[1]) + esc(via[0]) + '</span></div></div>';
+  h += '<div class="facts">' + [['Address', fWhere(e)], ['MAC', e.mac || 'After claim'], ['Serial', e.serialNo || e.serial || 'After claim'], ['Model', [e.make, e.model].filter(Boolean).join(' ') || 'After claim'], ['Android', e.android || 'After claim'], ['Last seen', dur(D.now - e.lastSeen) + ' ago']]
+    .map(function (f) { return '<div class="fact"><span class="k">' + f[0] + '</span><span class="v">' + esc(f[1]) + '</span></div>'; }).join('') + '</div>';
+  var timeline = function () {
+    var h = '';
+  var steps = e.steps && e.steps.length ? e.steps : null;
+    h += '<div class="sect"><div class="sh"><span class="eyebrow">' + (steps ? 'Claim' : 'What a claim does') + '</span></div><div class="tl">';
+    var defs = steps || ['connect', 'approve', 'identify', 'keep', 'clock', 'app', 'place', 'beat'].map(function (k) { return { key: k, name: { connect: 'Connect over the network', approve: 'Approved on the board', identify: 'Read who it is', keep: 'Keep network ADB on', clock: 'Check the clock', app: 'Note the app on screen', place: 'Place it', beat: 'First heartbeat' }[k], state: 'pending', text: '' }; });
+    defs.forEach(function (s) {
+      var icn = s.state === 'done' ? ic('check') : s.state === 'warn' ? ic('alert') : s.state === 'fail' ? ic('x') : '';
+      h += '<div class="ts ' + s.state + '"><span class="dt">' + icn + '</span><span class="tn">' + esc(s.name) + '</span><span class="tt">' + (s.at ? clockS(s.at) : '') + '</span><span class="td">' + esc(s.text || (steps ? '' : STEP_NOTE[s.key])) + '</span></div>';
+    });
+    h += '</div></div>';
+    return h;
+  };
+  var claimStarted = e.steps && e.steps.length;
+  if (claimStarted || e.status !== 'found') h += timeline();
+  if (e.status === 'claimed') {
+    var b = e.boardId && BY[e.boardId];
+    h += '<div class="okbox">Claimed as ' + esc(b ? b.name : 'a board') + '. It is on the heartbeat wall with the ADB keeper ' + (b && b.health.keeper ? 'running' : 'set up') + '.</div>' + (b ? '<div class="rowx"><button class="btn b-ok" data-showdev="' + b.id + '">' + ic('heart') + 'Open in Device health</button></div>' : '');
+    html('ndDetail', h); return;
+  }
+  if (e.status === 'claiming') { html('ndDetail', h); return; }
+  if (e.status === 'ignored') { h += '<div class="rowx"><button class="btn" data-restore="' + e.id + '">List it again</button></div>'; html('ndDetail', h); return; }
+  if (e.error) h += '<div class="badbox">Last try stopped: ' + esc(e.error) + '</div>';
+  var fp = D.fingerprint;
+  h += '<div class="claimgrid"><div class="sect"><span class="eyebrow">What the person at the board sees</span><div class="phone"><div class="ascr"><div class="adlg"><b>Allow USB debugging?</b><span>The computer’s RSA key fingerprint is:</span><code>' + esc(fp || 'shown on the board') + '</code><span class="ck"><i></i>Always allow from this computer</span><span class="bt"><span>Cancel</span><span>Allow</span></span></div></div></div><p class="note">' + (fp ? 'Ask them to check the fingerprint matches, tick Always allow, then tap Allow.' : 'Ask them to tick Always allow, then tap Allow.') + '</p></div>';
+  var F = S.form && S.form.id === e.id ? S.form : (S.form = { id: e.id, mode: 'add', name: '', kind: 'wb', unit: '', closet: '', room: '', app: '', replaceId: '' });
+  var candidates = D.boards.filter(function (b) { return b.health.state === 'offline' || b.health.state === 'degraded' || b.health.state === 'late'; }).concat(D.boards.filter(function (b) { return !(b.health.state === 'offline' || b.health.state === 'degraded' || b.health.state === 'late'); }));
+  h += '<div class="sect"><span class="eyebrow">Place it</span><div class="sugg">'
+    + '<div class="radio"><label><input type="radio" name="ndMode" value="add"' + (F.mode === 'add' ? ' checked' : '') + '><span>Add as a new board<small>It joins the wall in the room you pick.</small></span></label>'
+    + '<label><input type="radio" name="ndMode" value="replace"' + (F.mode === 'replace' ? ' checked' : '') + '><span>Replace a board<small>It takes over that board’s name, room, history and alerts.</small></span></label></div>';
+  if (F.mode === 'replace') {
+    h += '<label class="fld"><span class="sub-h">Board to replace</span><select data-f="replaceId"><option value="">Pick a board</option>' + candidates.map(function (b) { return '<option value="' + b.id + '"' + (F.replaceId === b.id ? ' selected' : '') + '>' + esc(b.name + ' · ' + b.health.state + ' · ' + b.host) + '</option>'; }).join('') + '</select></label>';
+  } else {
+    h += '<div class="fgrid"><label class="fld full"><span class="sub-h">Name</span><input class="in" data-f="name" value="' + esc(F.name) + '" placeholder="Room 415 Whiteboard" maxlength="60"></label>'
+      + '<label class="fld"><span class="sub-h">Type</span><select data-f="kind">' + kindOpts(F.kind) + '</select></label>'
+      + '<label class="fld"><span class="sub-h">Room</span><input class="in" data-f="room" value="' + esc(F.room) + '" placeholder="415" maxlength="20"></label>'
+      + '<label class="fld"><span class="sub-h">Unit</span><input class="in" data-f="unit" value="' + esc(F.unit) + '" list="dlUnits" placeholder="4 West" maxlength="40"></label>'
+      + '<label class="fld"><span class="sub-h">Closet</span><input class="in" data-f="closet" value="' + esc(F.closet) + '" list="dlClosets" placeholder="IDF 4A" maxlength="40"></label>'
+      + '<label class="fld full"><span class="sub-h">App to watch (blank uses the app on screen)</span><input class="in" data-f="app" value="' + esc(F.app) + '" placeholder="com.hci.one.board" spellcheck="false"></label></div>';
+  }
+  var ready = F.mode === 'replace' ? !!F.replaceId : true;
+  h += '<div class="rowx"><button class="btn b-ok" data-claim="' + e.id + '"' + (ready ? '' : ' disabled') + '>' + ic('check') + 'Claim and set up</button><button class="btn" data-ignore="' + e.id + '">Not ours, hide it</button></div>';
+  h += '</div></div></div>';
+  if (!claimStarted) h += timeline();
+  if (!S.formFocus) html('ndDetail', h);
+}
+
+/* ---------- render ---------- */
+function renderAll() {
+  renderNav(); renderStats(); manualLink();
+  $('vHealth').hidden = S.view !== 'health'; $('vNew').hidden = S.view !== 'new'; $('vAdmin').hidden = S.view !== 'admin';
+  if (S.view === 'health') { renderWall(); renderFleet(); renderPanel(); }
+  else if (S.view === 'new') renderNew();
+  renderSide();
+  var units = {}, closets = {};
+  D.boards.forEach(function (b) { if (b.unit) units[b.unit] = 1; if (b.closet) closets[b.closet] = 1; });
+  html('dlUnits', Object.keys(units).map(function (u) { return '<option value="' + esc(u) + '">'; }).join(''));
+  html('dlClosets', Object.keys(closets).map(function (u) { return '<option value="' + esc(u) + '">'; }).join(''));
+}
+function setView(v) { S.view = v; history.replaceState(null, '', v === 'new' ? '#new' : v === 'admin' ? '#admin' : '#'); CACHE = {}; renderAll(); }
+function manualLink() { var m = $('btnManual'); if (m) m.href = '/manual#' + (S.view === 'new' ? 'new' : 'health'); }
+
+/* ---------- console looks ---------- */
+function hms(t) { var d = new Date(t), p = function (n) { return (n < 10 ? '0' : '') + n; }; return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+function advState(b) { var L = S.look[b.id] || (S.look[b.id] = {}); return L.adv || (L.adv = { source: 'all', range: '48h', level: 'V', q: '' }); }
+function advViewer(b) {
+  var A = advState(b);
+  var seg = function (items, key) { return '<div class="looks" style="grid-template-columns:repeat(' + items.length + ',minmax(0,1fr));margin-bottom:8px">' + items.map(function (x) { return '<button class="btn' + (A[key] === x[0] ? ' on' : '') + '" data-adv="' + key + '=' + x[0] + '">' + esc(x[1]) + '</button>'; }).join('') + '</div>'; };
+  var h = '<div class="viewer"><div class="sh"><span class="sub-h">Log history, up to ' + (D && D.logs ? D.logs.retentionHours : 48) + ' h on this PC</span><span class="rowx"><button class="btn" style="min-height:32px;font-size:12px" data-advpull="1">' + ic('refresh') + 'Pull now</button></span></div>';
+  h += seg([['all', 'All'], ['camera', 'Camera'], ['led', 'LED ring'], ['crash', 'Crash']], 'source');
+  h += seg([['1h', '1h'], ['6h', '6h'], ['24h', '24h'], ['48h', '48h']], 'range');
+  h += seg([['V', 'All levels'], ['W', 'Warn and up'], ['E', 'Errors']], 'level');
+  h += '<div class="rowx" style="margin-bottom:8px"><input id="advQ" placeholder="Find text in the logs" value="' + esc(A.q || '') + '" style="flex:1;min-height:34px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--card);color:inherit;font-size:12.5px"><button class="btn" data-advfind="1">' + ic('list') + 'Find</button></div>';
+  if (A.loading) return h + '<div class="think" style="color:var(--muted)"><span class="dots"><i></i><i></i><i></i></span>Reading the log history</div></div>';
+  var d = A.data;
+  if (!d) return h + '<p class="note">Pick a view above to read this board’s saved logs.</p></div>';
+  if (!d.ok) return h + '<p class="note">' + esc(d.message || 'Could not read the logs.') + '</p></div>';
+  var meta = (d.total || 0) + ' line' + (d.total === 1 ? '' : 's') + (d.truncated ? ' · showing the newest ' + d.lines.length : '') + (d.newest ? ' · newest ' + clockS(d.newest) : '') + (d.source === 'crash' ? ' · live from the board' : (d.collecting ? '' : ' · collecting is off in Settings'));
+  h += '<div class="sub-h" style="margin:2px 0 6px">' + esc(meta) + '</div>';
+  if (!d.lines.length) h += '<p class="note">No lines match. Try a wider range or level, Pull now, or give it a minute to collect.</p>';
+  else h += '<pre class="logs">' + d.lines.map(function (l) { var cls = (l.lv === 'E' || l.lv === 'F') ? 'e' : (l.lv === 'W' ? 'w' : 'd'); return '<span class="' + cls + '">' + esc(hms(l.t) + '  ' + l.lv + '  ' + l.tag + ': ' + l.msg) + '</span>'; }).join('\n') + '</pre>';
+  return h + '</div>';
+}
+function loadAdv(b) {
+  var A = advState(b);
+  var qEl = $('advQ'); if (qEl) A.q = qEl.value;
+  A.loading = true; renderCon(b);
+  api('/api/logs?board=' + b.id + '&source=' + A.source + '&range=' + A.range + '&level=' + A.level + '&q=' + encodeURIComponent(A.q || '')).then(function (j) {
+    A.loading = false; A.data = j; renderCon(BY[b.id] || b);
+  });
+}
+function look(b, v) {
+  var L = S.look[b.id] || (S.look[b.id] = {});
+  if (v === 'adv') { if (L.view === 'adv') { L.view = null; renderCon(b); return; } L.view = 'adv'; renderCon(b); loadAdv(b); return; }
+  if (L.loading) return;
+  if (L.view === v && L.data) { L.view = null; L.data = null; renderCon(b); return; }
+  L.loading = v; L.view = v; renderCon(b);
+  if (v === 'screen') {
+    var url = '/api/boards/' + b.id + '/screen?fresh=1&t=' + Date.now();
+    var im = new Image();
+    im.onload = function () { L.loading = null; L.data = { at: Date.now(), url: url, cmd: 'adb -s ' + b.serial + ' exec-out screencap -p' }; renderCon(BY[b.id] || b); };
+    im.onerror = function () { L.loading = null; L.view = null; toast('Could not capture the screen.', true); renderCon(BY[b.id] || b); };
+    im.src = url; return;
+  }
+  api('/api/health/' + b.id + '/look', { view: v }).then(function (j) {
+    L.loading = null;
+    if (!j.ok) { L.view = null; toast(j.message, true); } else L.data = j;
+    renderCon(BY[b.id] || b);
+  });
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', function (ev) {
+  var el = ev.target.closest('button'); if (!el || el.disabled) return;
+  var ds = el.dataset, b = cur();
+  if (ds.view) { setView(ds.view); return; }
+  if (ds.pick) { select(ds.pick); return; }
+  if (ds.room) { var bs = D.boards.filter(function (x) { return roomKey(x) === ds.room; }); var w = worst(bs); if (w) select(w.id); return; }
+  if (ds.sel) { select(ds.sel); return; }
+  if (ds.issue) { var i = issueById(ds.issue); if (i && i.boards && i.boards[0] && BY[i.boards[0]]) select(i.boards[0]); return; }
+  if (ds.look && b) { look(b, ds.look); return; }
+  if (ds.adv && b) { var A = advState(b), kv = ds.adv.split('='); var qEl = $('advQ'); if (qEl) A.q = qEl.value; A[kv[0]] = kv[1]; loadAdv(b); return; }
+  if (ds.advfind && b) { loadAdv(b); return; }
+  if (ds.advpull && b) { var pb = b; api('/api/logs/pull', { board: pb.id }).then(function (j) { if (!j.ok) toast(j.message, true); loadAdv(pb); }); return; }
+  if (ds.snapone && b) { api('/api/snap', { ids: [b.id] }).then(function (j) { report({ ok: j.ok, message: j.ok ? 'Snapshot saved to ' + j.dir : (j.results && j.results[0] && j.results[0].message) || 'Snapshot failed.' }); }); return; }
+  if (ds.ledmode && b) { S.led[b.id] = ds.ledmode; renderCon(b); return; }
+  if (ds.led && b) { api('/api/health/' + b.id + '/led', { color: ds.led, mode: S.led[b.id] || 'solid' }).then(function (j) { report(j); }); return; }
+  if (ds.act && b) { S.confirm = { id: b.id, act: ds.act }; renderCon(b); return; }
+  if (ds.go && b && S.confirm) { var a = S.confirm.act; S.confirm = null; api('/api/health/' + b.id + '/act', { act: a }).then(function (j) { report(j); poll(); }); return; }
+  if (ds.cancel && b) { S.confirm = null; renderCon(b); return; }
+  if (ds.ack) { api('/api/health/notices/' + ds.ack + '/ack', {}).then(function (j) { report(j); poll(); }); return; }
+  if (ds.ai && b) { S.aiBusy[b.id] = true; renderAi(b); var id = b.id; api('/api/health/' + id + '/diagnose', {}).then(function (j) { S.aiBusy[id] = false; if (!j.ok) toast(j.message, true); poll(); }); return; }
+  if (ds.sendai && b) { api('/api/health/' + b.id + '/sendai', {}).then(function (j) { report(j); poll(); }); return; }
+  if (ds.copyev && b) { api('/api/health/' + b.id + '/evidence', {}).then(function (j) { if (!j.ok) return report(j); copy(j.text, 'Evidence copied. Paste it into a Claude chat.'); }); return; }
+  if (ds.settings) { openSettings(); return; }
+  if (ds.edit) { openEdit(ds.edit); return; }
+  if (ds.nd) { S.nd = ds.nd; S.form = null; CACHE.ndDetail = null; renderNew(); return; }
+  if (ds.ignore) { api('/api/found/' + ds.ignore + '/ignore', {}).then(function (j) { report(j); poll(); }); return; }
+  if (ds.restore) { api('/api/found/' + ds.restore + '/restore', {}).then(function (j) { report(j); poll(); }); return; }
+  if (ds.claim) {
+    var F = S.form || {};
+    var body = F.mode === 'replace' ? { mode: 'replace', replaceId: F.replaceId } : { mode: 'add', name: F.name, kind: F.kind, unit: F.unit, closet: F.closet, room: F.room, app: F.app };
+    api('/api/found/' + ds.claim + '/claim', body).then(function (j) { report(j); poll(); }); return;
+  }
+  if (ds.showdev) { select(ds.showdev); setView('health'); return; }
+});
+document.addEventListener('change', function (ev) {
+  var t = ev.target;
+  if (t.name === 'ndMode' && S.form) { S.form.mode = t.value; CACHE.ndDetail = null; renderNdDetail(); return; }
+  if (t.dataset && t.dataset.f && S.form) { S.form[t.dataset.f] = t.value; if (t.dataset.f === 'replaceId') { CACHE.ndDetail = null; renderNdDetail(); } }
+});
+document.addEventListener('input', function (ev) { var t = ev.target; if (t.dataset && t.dataset.f && S.form) S.form[t.dataset.f] = t.value; });
+document.addEventListener('focusin', function (ev) { if (ev.target.dataset && ev.target.dataset.f) S.formFocus = true; });
+document.addEventListener('focusout', function (ev) { if (ev.target.dataset && ev.target.dataset.f) setTimeout(function () { S.formFocus = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.f); }, 0); });
+document.addEventListener('submit', function (ev) {
+  if (ev.target.id === 'askForm') {
+    ev.preventDefault(); var b = cur(), q = ($('askIn').value || '').trim(); if (!b || !q) return;
+    S.askBusy = b.id; $('askIn').blur();
+    api('/api/health/' + b.id + '/ask', { q: q }).then(function (j) { S.askBusy = null; if (!j.ok) toast(j.message, true); CACHE.pAi = null; poll(); });
+    setTimeout(poll, 300);
+  }
+});
+function copy(text, ok) {
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { toast(ok); }, function () {
+    var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast(ok); } catch (e) { toast('Could not copy.', true); } ta.remove();
+  });
+}
+$('btnSweep').onclick = function () { $('btnSweep').disabled = true; api('/api/found/sweep', {}).then(function (j) { report(j); poll(); }); setTimeout(poll, 400); };
+$('btnHidden').onclick = function () { S.showHidden = !S.showHidden; renderNew(); };
+$('btnSettings').onclick = openSettings;
+$('btnRules').onclick = openSettings;
+
+/* ---------- settings ---------- */
+function openSettings() {
+  var s = D.settings;
+  $('sSite').value = s.site || ''; $('sServer').value = s.serverHost || ''; $('sTeamsHci').value = s.teamsHci || ''; $('sTeamsIt').value = s.teamsIt || '';
+  $('sOff').value = s.offlineSeconds; $('sEsc').value = s.escalateMinutes; $('sClock').value = s.clockDriftSeconds; $('sSweep').value = s.sweepMinutes; $('sNtp').value = s.ntpServer || '';
+  $('sPop').checked = !!s.popups; $('sPop').disabled = !s.windows; $('sKey').value = s.claudeKey || ''; $('sModel').value = s.claudeModel || ''; $('sLogs').checked = !!s.claudeLogs;
+  $('sLed').value = s.ledCommand || '';
+  $('setErr').textContent = ''; $('dlgSet').showModal();
+}
+function settingsBody() {
+  return { site: $('sSite').value, serverHost: $('sServer').value, teamsHci: $('sTeamsHci').value, teamsIt: $('sTeamsIt').value, offlineSeconds: $('sOff').value, escalateMinutes: $('sEsc').value,
+    clockDriftSeconds: $('sClock').value, sweepMinutes: $('sSweep').value, ntpServer: $('sNtp').value, popups: $('sPop').checked, claudeKey: $('sKey').value, claudeModel: $('sModel').value, claudeLogs: $('sLogs').checked, ledCommand: $('sLed').value };
+}
+$('formSet').onsubmit = function (ev) { ev.preventDefault(); api('/api/health/settings', settingsBody()).then(function (j) { if (!j.ok) { $('setErr').textContent = j.message; return; } $('dlgSet').close(); toast(j.message); poll(); }); };
+$('setCancel').onclick = function () { $('dlgSet').close(); };
+$('setTest').onclick = function () {
+  api('/api/health/settings', settingsBody()).then(function (j) {
+    if (!j.ok) { $('setErr').textContent = j.message; return; }
+    $('setErr').textContent = 'Sending…';
+    api('/api/health/test', {}).then(function (r) { $('setErr').textContent = r.message; $('setErr').style.color = r.ok ? 'var(--ok-ink)' : 'var(--bad-ink)'; poll(); });
+  });
+};
+
+/* ---------- placement ---------- */
+var editing = null;
+function openEdit(id) {
+  var b = BY[id]; if (!b) return; editing = id;
+  $('editTitle').textContent = 'Edit ' + b.name;
+  $('eName').value = b.name; $('eUnit').value = b.unit; $('eCloset').value = b.closet; $('eRoom').value = b.room; $('eApp').value = b.app;
+  $('eKind').innerHTML = kindOpts(b.kind);
+  var fg = b.health.facts && b.health.facts.fgPkg;
+  $('eUseFg').disabled = !fg; $('eFgNote').textContent = fg ? 'On screen now: ' + fg : 'Nothing known on screen yet.';
+  $('editErr').textContent = ''; $('dlgEdit').showModal();
+}
+$('eUseFg').onclick = function () { var b = BY[editing]; var fg = b && b.health.facts && b.health.facts.fgPkg; if (fg) $('eApp').value = fg; };
+$('editCancel').onclick = function () { $('dlgEdit').close(); };
+$('formEdit').onsubmit = function (ev) {
+  ev.preventDefault();
+  api('/api/boards/' + editing + '/edit', { name: $('eName').value, kind: $('eKind').value, unit: $('eUnit').value, closet: $('eCloset').value, room: $('eRoom').value, app: $('eApp').value.trim() })
+    .then(function (j) { if (!j.ok) { $('editErr').textContent = j.message; return; } $('dlgEdit').close(); toast('Saved.'); CACHE = {}; poll(); });
+};
+
+/* ---------- go ---------- */
+window.addEventListener('hashchange', function () { var v = location.hash === '#new' ? 'new' : 'health'; if (v !== S.view) setView(v); });
+var rz; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { CACHE.fleetChart = CACHE.pEcg = null; if (D) { renderFleet(); if (cur()) html('pEcg', ecg(cur())); } }, 120); });
+poll();
+setInterval(function () { if (!document.hidden && !document.querySelector('dialog[open]')) poll(); }, 2000);
+})();
+</script>
+<script src="/remote-banner.js"></script>
+</body>
+</html>

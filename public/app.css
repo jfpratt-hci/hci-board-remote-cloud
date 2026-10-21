@@ -165,3 +165,13 @@ body.dopen main{margin-right:416px}
   body.dopen main{margin-right:0}
   .search{width:auto;flex:1}.filters{flex-wrap:wrap;width:100%}
 }
+/* updates */
+.field textarea{border-radius:10px;border:2px solid var(--line);padding:10px 12px;font:600 14px var(--font);color:var(--ink);outline:0;width:100%;resize:vertical}
+.field textarea:focus{border-color:var(--ink)}
+.field input[type=file]{height:auto;padding:9px 10px;font-size:13px}
+.updbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:10px 12px;margin-bottom:12px;border-radius:12px;background:var(--soft);font-size:13px;font-weight:600}
+.updbar .sel{width:auto;height:36px}
+.updbar .btn{height:36px}
+#v-pcs .panel:first-child{grid-template-rows:auto auto minmax(0,1fr)}
+#v-upd .panel:first-child{grid-template-rows:auto minmax(0,auto) auto minmax(0,1fr)}
+#v-upd .panel:first-child .tablewrap:first-of-type{max-height:42vh}

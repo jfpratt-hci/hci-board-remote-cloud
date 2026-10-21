@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2EFE9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HCI Remote">
+<title>HCI ONE Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231E1C19'/%3E%3Cpath d='M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='15' r='1.6' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#F2EFE9; --card:#FFFFFF; --soft:#F6F4EF; --line:#E7E2D9;
+  --ink:#1E1C19; --ink2:#3A3733; --muted:#7A766F;
+  --green:#14A44D; --green-bg:#E2F4E8;
+  --amber:#C98204; --amber-bg:#FCF0D6;
+  --red:#D93A2F;   --red-bg:#FBE4E1;
+  --blue:#2563EB;  --blue-bg:#E3EBFD;
+  --grey:#8C877F;  --grey-bg:#ECE8E1;
+  --r:16px; --g:16px;
+  --font:'Montserrat','Segoe UI',system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Mono',Consolas,monospace;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--ground);color:var(--ink);font:500 14px/1.4 var(--font)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+[hidden]{display:none!important}
+.label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:12px;background:var(--soft);font-weight:700;font-size:14px;white-space:nowrap;text-decoration:none}
+.btn:active{transform:translateY(1px)}
+.btn.dark{background:var(--ink);color:#fff}
+.btn.green{background:var(--green);color:#fff}
+.btn.danger{color:var(--red)}
+.btn.sm{height:34px;padding:0 12px;font-size:12.5px;border-radius:10px}
+.btn[disabled]{opacity:.42;pointer-events:none}
+@media (hover:hover){.btn:hover{filter:brightness(.97)}.btn.dark:hover{background:#34312c}}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:10;background:rgba(242,239,233,.92);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px)}
+.topin{max-width:1240px;margin:0 auto;padding:12px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.mark{width:38px;height:38px;border-radius:11px;background:var(--ink);display:grid;place-items:center;color:#fff}
+.mark svg{width:21px;height:21px}
+.brand .k{font-size:9.5px;font-weight:800;letter-spacing:.16em;color:var(--muted)}
+.brand .n{font-size:17px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.me{width:38px;height:38px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-weight:800;font-size:14px;box-shadow:0 0 0 1px var(--line)}
+.menu{position:absolute;right:16px;top:58px;background:var(--card);border-radius:14px;padding:6px;min-width:220px;box-shadow:0 16px 44px rgba(30,28,25,.2);z-index:30}
+.menu .who{padding:10px 12px 8px;font-size:12px;color:var(--muted)}
+.menu .who b{display:block;color:var(--ink);font-size:14px}
+.menu button{display:flex;gap:10px;align-items:center;width:100%;height:42px;padding:0 12px;border-radius:9px;font-weight:600;text-align:left}
+.menu button:hover{background:var(--soft)}
+
+main{max-width:1240px;margin:0 auto;padding:4px 16px calc(32px + var(--safe-b))}
+.crumb{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--muted);font-size:13px;text-decoration:none;margin:4px 0 10px}
+.crumb svg{width:16px;height:16px}
+h1.title{margin:0;font-size:26px;font-weight:800;letter-spacing:-.015em;line-height:1.15}
+.headrow{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.substat{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-weight:700;font-size:11.5px;background:var(--grey-bg);color:var(--ink2);white-space:nowrap}
+.chip .d{width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.ok{background:var(--green-bg);color:#0d7a38}
+.chip.warn{background:var(--amber-bg);color:#8a5a00}
+.chip.bad{background:var(--red-bg);color:#a82a22}
+.chip.info{background:var(--blue-bg);color:var(--blue)}
+.chip.dark{background:var(--ink);color:#fff}
+
+/* fleet */
+.sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--g)}
+.site{background:var(--card);border-radius:var(--r);padding:16px;display:grid;gap:14px;text-align:left;width:100%;box-shadow:0 1px 0 rgba(30,28,25,.04)}
+@media (hover:hover){.site:hover{box-shadow:0 0 0 2px var(--ink)}}
+.site .nm{font-size:17px;font-weight:800;line-height:1.2}
+.site .st{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-top:4px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--grey);flex:none}
+.dot.ok{background:var(--green);box-shadow:0 0 0 3px var(--green-bg)}
+.dot.warn{background:var(--amber);box-shadow:0 0 0 3px var(--amber-bg)}
+.dot.bad{background:var(--red);box-shadow:0 0 0 3px var(--red-bg)}
+.dot.late{background:#fff;box-shadow:inset 0 0 0 2.5px var(--blue)}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cnt{background:var(--soft);border-radius:10px;padding:8px 10px}
+.cnt b{display:block;font-size:20px;font-weight:800;line-height:1.1}
+.cnt span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cnt.bad b{color:var(--red)} .cnt.warn b{color:var(--amber)} .cnt.late b{color:var(--blue)} .cnt.ok b{color:var(--green)}
+.site .foot{display:flex;flex-wrap:wrap;gap:6px}
+
+/* site */
+.issues{display:grid;gap:8px;margin-bottom:18px}
+.issue{background:var(--card);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.issue .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--red);color:#fff}
+.issue.caution .ic{background:var(--amber)}
+.issue b{display:block;font-size:14px}
+.issue .w{font-size:12.5px;color:var(--muted)}
+.issue .ago{font:600 12px var(--mono);color:var(--muted);text-align:right}
+.tools{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.search{flex:1 1 220px;display:flex;align-items:center;gap:8px;height:44px;padding:0 14px;border-radius:12px;background:var(--card);color:var(--muted)}
+.search input{border:0;outline:0;background:none;width:100%;font-weight:600;color:var(--ink)}
+.seg{display:inline-flex;background:var(--card);border-radius:12px;padding:4px;gap:2px}
+.seg button{height:36px;padding:0 12px;border-radius:9px;font-weight:700;font-size:12.5px;color:var(--muted)}
+.seg button.on{background:var(--ink);color:#fff}
+.unit{margin-bottom:18px}
+.unit h3{margin:0 0 10px;display:flex;gap:10px;align-items:baseline;font-size:16px;font-weight:800}
+.unit h3 span{font-size:12px;font-weight:600;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
+.tile{background:var(--card);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;text-align:left;width:100%}
+@media (hover:hover){.tile:hover{box-shadow:0 0 0 2px var(--ink)}}
+.tile .rm{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .ty{grid-column:2;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-2px}
+.tile.bad{box-shadow:inset 3px 0 0 var(--red)}
+.tile.warn{box-shadow:inset 3px 0 0 var(--amber)}
+.offline-note{background:var(--amber-bg);color:#6e4800;border-radius:12px;padding:10px 14px;font-weight:600;font-size:13px;margin-bottom:14px}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(23,22,15,.45);z-index:40;display:grid;align-items:end;justify-items:center}
+@media (min-width:760px){.scrim{align-items:center}}
+.sheet{background:var(--card);width:min(560px,100%);max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + var(--safe-b));display:grid;gap:14px;animation:up .2s ease-out}
+@media (min-width:760px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+.sheet .hd{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+.sheet h2{margin:0;font-size:20px;font-weight:800;line-height:1.2}
+.sheet .loc{font-size:12.5px;color:var(--muted);margin-top:3px}
+.x{width:36px;height:36px;border-radius:10px;background:var(--soft);display:grid;place-items:center}
+.stateblk{border-radius:14px;padding:12px 14px;background:var(--soft);display:grid;gap:4px}
+.stateblk .w{display:flex;gap:10px;align-items:center;font-weight:800;font-size:16px}
+.stateblk .h{font-size:13px;color:var(--ink2)}
+.stateblk.bad{background:var(--red-bg)} .stateblk.warn{background:var(--amber-bg)} .stateblk.ok{background:var(--green-bg)} .stateblk.late{background:var(--blue-bg)}
+.kv{display:grid;grid-template-columns:128px 1fr;gap:8px 12px;font-size:13px;margin:0}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;font-weight:700;overflow-wrap:anywhere}
+.faults{display:grid;gap:6px}
+.fault{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13px}
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.acts .btn{height:56px;flex-direction:column;gap:3px;font-size:12px;padding:0 6px}
+.acts .btn.dark{grid-column:1/-1;height:50px;flex-direction:row;gap:10px;font-size:14px}
+.why{font-size:12.5px;color:var(--muted);margin:-4px 0 0}
+
+/* live */
+.live{position:fixed;inset:0;z-index:60;background:#111;color:#fff;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.lbar{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px}
+.lbar .x{background:rgba(255,255,255,.12);color:#fff}
+.lbar .nm{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbar .sub{font-size:11.5px;color:#bdb8ae}
+.pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;font-size:11.5px;font-weight:800;background:rgba(255,255,255,.12)}
+.pill .d{width:8px;height:8px;border-radius:50%;background:#8C877F}
+.pill.on .d{background:#22c55e;animation:pulse 1.2s infinite}
+.pill.wait .d{background:#60a5fa;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.stage{position:relative;display:grid;place-items:center;min-height:0;padding:0 8px}
+.stage canvas,.stage img{max-width:100%;max-height:100%;display:block;border-radius:8px;touch-action:none;user-select:none;-webkit-user-select:none;background:#000}
+.lmsg{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;text-align:center;padding:24px}
+.lmsg b{font-size:17px}
+.lmsg span{color:#cfcac1;font-size:13.5px;max-width:420px}
+.spin{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.keys{display:flex;gap:8px;justify-content:center;padding:10px 12px calc(12px + var(--safe-b))}
+.keys button{height:48px;min-width:84px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font-weight:700;font-size:12px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.keys button:active{background:rgba(255,255,255,.22)}
+.fps{font:600 11px var(--mono);color:#9c968c;text-align:center;padding-bottom:4px}
+.rip{position:fixed;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid #fff;pointer-events:none;animation:rip .45s ease-out forwards;z-index:70}
+@keyframes rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.4);opacity:0}}
+
+/* login */
+.login{min-height:100vh;display:grid;place-items:center;padding:24px}
+.lcard{background:var(--card);border-radius:22px;padding:28px 24px;width:min(400px,100%);display:grid;gap:16px}
+.lcard .mark{width:48px;height:48px;border-radius:14px}
+.lcard h1{margin:4px 0 0;font-size:24px;font-weight:800}
+.lcard p{margin:-8px 0 0;color:var(--muted);font-size:13.5px}
+.field{display:grid;gap:6px}
+.field label{font-size:12px;font-weight:700;color:var(--ink2)}
+.field input,.field select{height:48px;border-radius:12px;border:2px solid var(--line);padding:0 14px;font-weight:600;font-size:16px;outline:0;background:#fff;width:100%}
+.field input:focus,.field select:focus{border-color:var(--ink)}
+.err{color:var(--red);font-weight:600;font-size:13px;min-height:18px}
+
+/* admin */
+.agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--g);align-items:start}
+.agrid .wide{grid-column:1/-1}
+.card{background:var(--card);border-radius:var(--r);padding:18px;display:grid;gap:14px}
+.card h2{margin:0;font-size:17px;font-weight:800}
+.card .sub{margin:-8px 0 0;color:var(--muted);font-size:13px}
+.codebox{background:var(--ink);color:#fff;border-radius:14px;padding:16px;display:grid;gap:8px}
+.codebox .c{font:800 30px var(--mono);letter-spacing:.14em}
+.codebox .s{font-size:12.5px;color:#d8d3ca}
+.codebox code{font-family:var(--mono);background:rgba(255,255,255,.12);padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
+.rows{display:grid}
+.row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row b{display:block;font-size:14px}
+.row span{font-size:12px;color:var(--muted)}
+.log{display:grid;max-height:520px;overflow:auto}
+.ent{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:12.5px}
+.ent:first-child{border-top:0}
+.ent .t{font:600 11.5px var(--mono);color:var(--muted)}
+.ent b{font-weight:700}
+.ent .m{color:var(--muted)}
+.inline{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+
+.toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + var(--safe-b));display:grid;gap:8px;z-index:80;width:min(420px,calc(100vw - 32px))}
+.toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-weight:600;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:up .2s ease-out}
+.toast.err{background:var(--red)}
+.empty{background:var(--card);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+@media (max-width:520px){h1.title{font-size:22px}.counts .cnt b{font-size:18px}.kv{grid-template-columns:110px 1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+'use strict';
+const $ = (s, el) => (el || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const IC = {
+  mark: '<svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="15.5" r="1.2"/><path d="M4 20h16"/></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  restart: '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',
+  power: '<svg viewBox="0 0 24 24"><path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10"/></svg>',
+  sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+  alert: '<svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  out: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+};
+const KIND = { wb: 'Whiteboard', ds: 'Door sign', tv: 'Patient TV', cam: 'Camera', tab: 'Tablet', usb: 'Unit Status Board', other: 'Device' };
+const STATE = {
+  online: { cls: 'ok', word: 'Online' }, degraded: { cls: 'warn', word: 'Needs a look' }, late: { cls: 'late', word: 'Heartbeat late' },
+  offline: { cls: 'bad', word: 'Offline' }, unknown: { cls: '', word: 'Checking' }, paused: { cls: '', word: 'Not watched' }
+};
+const POLICY = { off: ['', 'Remote off'], health: ['', 'Health only'], fixes: ['info', 'Fixes allowed'], live: ['ok', 'Live view allowed'] };
+const LEVEL = { off: 0, health: 1, fixes: 2, live: 3 };
+
+let ME = null, SITES = [], SITE = null, ADMIN = null, timer = null, menuOpen = false;
+
+/* ---------- helpers ---------- */
+function toast(msg, bad) {
+  const t = document.createElement('div'); t.className = 'toast' + (bad ? ' err' : ''); t.textContent = msg;
+  $('#toasts').append(t); setTimeout(() => t.remove(), 4200);
+}
+async function api(p, body) {
+  try {
+    const r = await fetch(p, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-HCI-Remote': '1' }, body: JSON.stringify(body), credentials: 'same-origin' } : { cache: 'no-store', credentials: 'same-origin' });
+    if (r.status === 401 && !/\/api\/login$/.test(p)) { ME = null; route(); return { ok: false, message: 'Sign in first.' }; }
+    return await r.json();
+  } catch (e) { return { ok: false, message: 'Cannot reach HCI ONE Remote right now.' }; }
+}
+function dur(ms) {
+  if (ms == null || ms < 0) return '';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.round(s / 60) + ' min';
+  if (s < 86400) { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h + ' h' + (m ? ' ' + m + ' min' : ''); }
+  return Math.round(s / 86400) + ' d';
+}
+const clock = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const day = t => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
+const roomName = r => /^\d/.test(r) ? 'Room ' + r : r;
+function boardTitle(b) { return b.room ? roomName(b.room) : b.name; }
+function go(h) { if (location.hash !== h) location.hash = h; else route(); }
+
+/* ---------- shell ---------- */
+function shell(inner) {
+  const ini = ME ? ME.name.slice(0, 1).toUpperCase() : '';
+  return '<header class="top"><div class="topin"><a class="brand" href="#/"><span class="mark">' + IC.mark + '</span><span><span class="k">HCI ONE</span><br><span class="n">Remote</span></span></a><span></span>' +
+    '<button class="me" id="meBtn" aria-label="Account">' + esc(ini) + '</button></div></header>' +
+    '<div class="menu" id="menu"' + (menuOpen ? '' : ' hidden') + '><div class="who">Signed in as<b>' + esc(ME ? ME.name : '') + '</b></div>' +
+    (ME && ME.role === 'admin' ? '<button data-m="admin">' + IC.gear + 'Admin: sites, users, activity</button>' : '') +
+    '<button data-m="pass">' + IC.lock + 'Change password</button><button data-m="out">' + IC.out + 'Sign out</button></div>' +
+    '<main>' + inner + '</main>';
+}
+function wireShell() {
+  $('#meBtn').onclick = e => { e.stopPropagation(); menuOpen = !menuOpen; $('#menu').hidden = !menuOpen; };
+  document.querySelectorAll('#menu [data-m]').forEach(b => b.onclick = () => {
+    menuOpen = false; $('#menu').hidden = true;
+    if (b.dataset.m === 'admin') go('#/admin');
+    if (b.dataset.m === 'pass') passDialog();
+    if (b.dataset.m === 'out') api('/api/logout', {}).then(() => { ME = null; location.hash = '#/'; route(); });
+  });
+}
+document.addEventListener('click', e => { if (menuOpen && !e.target.closest('#menu')) { menuOpen = false; const m = $('#menu'); if (m) m.hidden = true; } });
+
+/* ---------- sign in ---------- */
+function loginView() {
+  stopTimer();
+  $('#app').innerHTML = '<div class="login"><form class="lcard" id="lf" autocomplete="on"><span class="mark">' + IC.mark + '</span><div><div class="label">HCI ONE</div><h1>Remote</h1></div>' +
+    '<p>Every customer site, every board, from wherever you are.</p>' +
+    '<div class="field"><label for="ln">Name</label><input id="ln" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>' +
+    '<div class="field"><label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required></div>' +
+    '<div class="err" id="lerr"></div><button class="btn dark" type="submit">Sign in</button></form></div>';
+  $('#ln').focus();
+  $('#lf').onsubmit = async e => {
+    e.preventDefault();
+    $('#lerr').textContent = '';
+    const r = await api('/api/login', { name: $('#ln').value, pass: $('#lp').value });
+    if (!r.ok) { $('#lerr').textContent = r.message || 'That did not work.'; return; }
+    ME = { name: r.name, role: r.role };
+    route();
+  };
+}
+
+/* ---------- fleet ---------- */
+function siteCard(s) {
+  const c = s.counts || {};
+  const pol = POLICY[s.policy] || POLICY.health;
+  const status = s.online ? '<span class="dot ok"></span>Connected' : '<span class="dot"></span>' + (s.lastSeen ? 'Offline, last seen ' + dur(Date.now() - s.lastSeen) + ' ago' : 'Not connected yet');
+  return '<button class="site" data-site="' + s.id + '"><div><div class="nm">' + esc(s.name) + '</div><div class="st">' + status + '</div></div>' +
+    (s.counts ? '<div class="counts"><div class="cnt ok"><b>' + (c.online || 0) + '</b><span>Online</span></div><div class="cnt late"><b>' + (c.late || 0) + '</b><span>Late</span></div>' +
+      '<div class="cnt warn"><b>' + (c.degraded || 0) + '</b><span>Look</span></div><div class="cnt bad"><b>' + (c.offline || 0) + '</b><span>Offline</span></div></div>' : '<div class="muted" style="font-size:13px">No board data yet.</div>') +
+    '<div class="foot"><span class="chip ' + pol[0] + '">' + pol[1] + (s.policy === 'live' && s.ask ? ', asks first' : '') + '</span>' +
+    (s.issues ? '<span class="chip bad"><span class="d"></span>' + s.issues + ' open issue' + (s.issues === 1 ? '' : 's') + '</span>' : '') +
+    (c.unknown ? '<span class="chip">' + c.unknown + ' still checking</span>' : '') + '</div></button>';
+}
+async function fleetView() {
+  const r = await api('/api/sites');
+  if (!r.ok) return;
+  SITES = r.sites;
+  if (route.view !== 'fleet') return;
+  const total = SITES.reduce((n, s) => n + (s.counts ? Object.values(s.counts).reduce((a, b) => a + b, 0) : 0), 0);
+  const up = SITES.filter(s => s.online).length;
+  const body = SITES.length ? '<div class="sites">' + SITES.map(siteCard).join('') + '</div>'
+    : '<div class="empty"><b>No sites yet</b>' + (ME.role === 'admin' ? 'Open Admin and make an enrollment code. A hospital\'s Board Remote uses it to connect.' : 'Ask an admin to connect a hospital.') + '</div>';
+  $('#app').innerHTML = shell('<div class="headrow"><div><h1 class="title">Sites</h1><div class="substat"><span class="chip">' + SITES.length + ' site' + (SITES.length === 1 ? '' : 's') + ', ' + up + ' connected</span><span class="chip">' + total + ' boards</span></div></div></div>' + body);
+  wireShell();
+  document.querySelectorAll('[data-site]').forEach(b => b.onclick = () => go('#/s/' + b.dataset.site));
+  every(fleetView, 5000);
+}
+
+/* ---------- one site ---------- */
+let filt = { q: '', bad: false, site: '' };
+function stateOf(b) { return STATE[b.state] || STATE.unknown; }
+const needsLook = b => b.state === 'offline' || b.state === 'late' || b.state === 'degraded';
+async function siteView(id, boardId) {
+  const r = await api('/api/sites/' + id);
+  if (route.view !== 'site' || route.site !== id) return;
+  if (!r.ok) { $('#app').innerHTML = shell('<a class="crumb" href="#/">' + IC.back + 'All sites</a><div class="empty"><b>Site not found</b>' + esc(r.message || '') + '</div>'); wireShell(); return; }
+  SITE = r;
+  if (filt.site !== id) filt = { q: '', bad: false, site: id };   // a new site starts unfiltered
+  $('#app').innerHTML = shell('<a class="crumb" href="#/">' + IC.back + 'All sites</a><div class="headrow"><div><h1 class="title" id="sname"></h1><div class="substat" id="schips"></div></div></div>' +
+    '<div id="snote"></div><div id="sissues"></div><div id="stools" hidden><div class="tools"><label class="search">' + IC.search + '<input id="q" placeholder="Room, name or unit" autocomplete="off" spellcheck="false"></label>' +
+    '<div class="seg"><button data-f="all"></button><button data-f="bad"></button></div></div></div><div id="units"></div>');
+  wireShell();
+  $('#q').value = filt.q;
+  $('#q').oninput = e => { filt.q = e.target.value; renderUnits(); };
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filt.bad = b.dataset.f === 'bad'; paintSite(); });
+  paintSite();
+  if (boardId) openBoard(boardId);
+  every(() => refreshSite(id), 3000);
+}
+async function refreshSite(id) {
+  const r = await api('/api/sites/' + id);
+  if (route.view !== 'site' || route.site !== id) return;
+  if (r.ok) {
+    SITE = r;
+    paintSite();
+    if (route.board && $('#scrim')) openBoard(route.board);
+  }
+  every(() => refreshSite(id), 3000);
+}
+function paintSite() {
+  const s = SITE.site, st = SITE.state;
+  const pol = POLICY[s.policy] || POLICY.health;
+  $('#sname').textContent = s.name;
+  $('#schips').innerHTML = (s.online ? '<span class="chip ok"><span class="d"></span>Connected</span>' : '<span class="chip"><span class="d"></span>Offline</span>') +
+    '<span class="chip ' + pol[0] + '">' + pol[1] + (s.policy === 'live' && s.ask ? ', asks first' : '') + '</span>' +
+    (s.version ? '<span class="chip">Board Remote ' + esc(s.version) + '</span>' : '');
+  $('#snote').innerHTML = s.online ? '' : '<div class="offline-note">This site is not connected. You are seeing what it last sent, ' + dur(s.stateAge || 0) + ' ago.</div>';
+  $('#stools').hidden = !st;
+  if (!st) { $('#sissues').innerHTML = ''; $('#units').innerHTML = '<div class="empty"><b>No board data yet</b>It arrives a few seconds after the site connects.</div>'; return; }
+  const age = s.stateAge || 0;
+  const issues = (st.issues || []).slice().sort((a, b) => (a.sev === 'urgent' ? 0 : 1) - (b.sev === 'urgent' ? 0 : 1));
+  $('#sissues').innerHTML = issues.length ? '<div class="issues">' + issues.map(i => '<div class="issue ' + (i.sev === 'urgent' ? '' : 'caution') + '"><span class="ic">' + IC.alert + '</span><div><b>' + esc(i.title) + '</b><div class="w">' + esc(i.where) + '</div></div><div class="ago">' + dur((i.ago || 0) + age) + (i.acked ? '<br>acknowledged' : '') + '</div></div>').join('') + '</div>' : '';
+  const bad = st.boards.filter(needsLook).length;
+  const segs = document.querySelectorAll('[data-f]');
+  segs[0].textContent = 'All ' + st.boards.length; segs[1].textContent = 'Needs a look ' + bad;
+  segs.forEach(x => x.classList.toggle('on', (x.dataset.f === 'bad') === filt.bad));
+  renderUnits();
+}
+function renderUnits() {
+  if (!SITE || !SITE.state) return;
+  const q = filt.q.trim().toLowerCase();
+  const list = SITE.state.boards.filter(b => (!filt.bad || needsLook(b)) &&
+    (!q || [b.name, b.room, b.unit, KIND[b.kind]].some(v => String(v || '').toLowerCase().includes(q))));
+  const units = new Map();
+  list.forEach(b => { const u = b.unit || 'Not placed'; if (!units.has(u)) units.set(u, []); units.get(u).push(b); });
+  const names = Array.from(units.keys()).sort((a, b) => a === 'Not placed' ? 1 : b === 'Not placed' ? -1 : a.localeCompare(b, undefined, { numeric: true }));
+  const KO = ['usb', 'wb', 'ds', 'tv', 'cam', 'tab', 'other'];
+  const html = names.map(u => {
+    const bs = units.get(u).sort((a, b) => String(a.room).localeCompare(String(b.room), undefined, { numeric: true }) || KO.indexOf(a.kind) - KO.indexOf(b.kind));
+    const down = bs.filter(b => b.state === 'offline').length;
+    return '<section class="unit"><h3>' + esc(u) + '<span>' + bs.length + ' board' + (bs.length === 1 ? '' : 's') + (down ? ', ' + down + ' offline' : '') + '</span></h3><div class="tiles">' +
+      bs.map(b => { const L = stateOf(b); return '<button class="tile ' + L.cls + '" data-b="' + b.id + '"><span class="dot ' + L.cls + '"></span><span class="rm">' + esc(boardTitle(b)) + '</span><span class="ty">' + esc((KIND[b.kind] || 'Device') + (b.state !== 'online' ? ', ' + L.word.toLowerCase() : '')) + '</span></button>'; }).join('') + '</div></section>';
+  }).join('');
+  $('#units').innerHTML = html || '<div class="empty"><b>No boards match</b>Try another room or clear the filter.</div>';
+  document.querySelectorAll('[data-b]').forEach(t => t.onclick = () => go('#/s/' + SITE.site.id + '/b/' + t.dataset.b));
+}
+
+/* ---------- one board ---------- */
+function openBoard(id) {
+  const b = SITE && SITE.state && SITE.state.boards.find(x => x.id === id);
+  let scrim = $('#scrim');
+  if (!b) { if (scrim) scrim.remove(); return; }
+  const s = SITE.site, L = stateOf(b), age = s.stateAge || 0;
+  const lvl = s.online ? LEVEL[s.policy] || 0 : 0;
+  const why = !s.online ? 'This site is not connected right now.' : lvl < LEVEL.fixes ? 'This hospital allows health only. Its IT team can change that in Board Remote.' : lvl < LEVEL.live ? 'This hospital allows fixes, not live view.' : (s.ask ? 'Someone at the hospital is asked before live view starts.' : '');
+  const html = '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(b.name) + '"><div class="hd"><div><h2>' + esc(b.name) + '</h2><div class="loc">' + esc([b.unit, b.closet, KIND[b.kind]].filter(Boolean).join('  ·  ')) + '</div></div><button class="x" id="xb" aria-label="Close">' + IC.x + '</button></div>' +
+    '<div class="stateblk ' + L.cls + '"><div class="w"><span class="dot ' + L.cls + '"></span>' + L.word + (b.sinceAgo != null ? '<span class="muted" style="font-weight:600;font-size:13px">for ' + dur(b.sinceAgo + age) + '</span>' : '') + '</div>' + (b.headline ? '<div class="h">' + esc(b.headline) + '</div>' : '') + '</div>' +
+    (b.faults && b.faults.length ? '<div class="faults">' + b.faults.map(f => '<div class="fault"><span class="dot ' + (f.sev === 'urgent' ? 'bad' : 'warn') + '"></span>' + esc(f.title) + '</div>').join('') + '</div>' : '') +
+    '<dl class="kv"><dt>Last heartbeat</dt><dd>' + (b.beatAgo != null ? dur(b.beatAgo + age) + ' ago' : 'None yet') + '</dd>' +
+    '<dt>On screen</dt><dd>' + esc(b.onScreen || 'Unknown') + (b.awake === false ? ', screen asleep' : '') + '</dd>' +
+    '<dt>Watched app</dt><dd>' + esc(b.watch || 'Not set') + '</dd>' +
+    '<dt>Device</dt><dd>' + esc([b.model, b.android ? 'Android ' + b.android : ''].filter(Boolean).join(', ') || 'Unknown') + '</dd></dl>' +
+    '<div class="acts"><button class="btn dark" data-a="live"' + (lvl >= LEVEL.live && b.adb === 'online' ? '' : ' disabled') + '>' + IC.eye + 'Live view</button>' +
+    '<button class="btn" data-a="restartapp"' + (lvl >= LEVEL.fixes && b.adb === 'online' && b.watch ? '' : ' disabled') + '>' + IC.restart + 'Restart app</button>' +
+    '<button class="btn" data-a="wake"' + (lvl >= LEVEL.fixes && b.adb === 'online' ? '' : ' disabled') + '>' + IC.sun + 'Wake screen</button>' +
+    '<button class="btn danger" data-a="reboot"' + (lvl >= LEVEL.fixes && b.adb === 'online' ? '' : ' disabled') + '>' + IC.power + 'Reboot</button></div>' +
+    (why ? '<p class="why">' + esc(why) + '</p>' : '') + '</div>';
+  const keep = scrim && scrim.dataset.id === id ? scrim.scrollTop : 0;
+  if (!scrim) { scrim = document.createElement('div'); scrim.className = 'scrim'; scrim.id = 'scrim'; document.body.append(scrim); }
+  scrim.dataset.id = id;
+  scrim.innerHTML = html;
+  scrim.scrollTop = keep;
+  scrim.onclick = e => { if (e.target === scrim) go('#/s/' + s.id); };
+  $('#xb').onclick = () => go('#/s/' + s.id);
+  scrim.querySelectorAll('[data-a]').forEach(btn => btn.onclick = () => boardAction(b, btn.dataset.a, btn));
+}
+async function boardAction(b, a, btn) {
+  const sid = SITE.site.id;
+  if (a === 'live') return go('#/s/' + sid + '/live/' + b.id);
+  if (a === 'reboot' && !confirm('Reboot ' + b.name + '? It drops off for about a minute and reconnects on its own.')) return;
+  btn.disabled = true;
+  const r = a === 'wake' ? await api('/api/sites/' + sid + '/boards/' + b.id + '/key', { key: 'wake' }) : await api('/api/sites/' + sid + '/boards/' + b.id + '/' + a, {});
+  btn.disabled = false;
+  toast(r.message || (r.ok ? 'Done.' : 'That did not work.'), !r.ok);
+}
+
+/* ---------- live view: the board's own video, through the relay, with touch ---------- */
+let LV = null;
+function liveView(sid, bid) {
+  stopTimer();
+  const b = SITE && SITE.site.id === sid && SITE.state ? SITE.state.boards.find(x => x.id === bid) : null;
+  const name = b ? b.name : 'Board';
+  const scrim = $('#scrim'); if (scrim) scrim.remove();
+  const el = document.createElement('div');
+  el.className = 'live'; el.id = 'live';
+  el.innerHTML = '<div class="lbar"><button class="x" id="lx" aria-label="Close live view">' + IC.x + '</button><div style="min-width:0"><div class="nm">' + esc(name) + '</div><div class="sub">' + esc(SITE ? SITE.site.name : '') + '</div></div><span class="pill wait" id="lpill"><span class="d"></span><span id="lword">Starting</span></span></div>' +
+    '<div class="stage" id="stage"><canvas id="cv" hidden></canvas><img id="snap" alt="" hidden><div class="lmsg" id="lmsg"><div class="spin"></div><b id="lmt">Starting live view</b><span id="lms">Asking the site for video.</span></div></div>' +
+    '<div><div class="fps" id="fps"></div><div class="keys"><button data-k="back">' + IC.back + 'Back</button><button data-k="home">' + IC.home + 'Home</button><button data-k="wake">' + IC.sun + 'Wake</button></div></div>';
+  document.body.append(el);
+  document.body.style.overflow = 'hidden';
+  $('#lx').onclick = () => go('#/s/' + sid + '/b/' + bid);
+  const st = LV = { sid, bid, ws: null, dec: null, codecName: 'h264', cfg: null, key: false, shown: false, dead: false, n: 0, t0: performance.now(), w: 0, h: 0, ch: 0 };
+  el.querySelectorAll('[data-k]').forEach(k => k.onclick = () => sendKey(st, k.dataset.k));
+  const cv = $('#cv');
+  st.ctx = cv.getContext('2d');
+  wireTouch(st, cv);
+  if (!('VideoDecoder' in window)) return snapMode(st, 'This browser cannot play live video, so it shows a picture every few seconds. Touch needs Safari 16.4 or newer, Chrome or Edge.');
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = st.ws = new WebSocket(proto + '//' + location.host + '/ws/live?site=' + encodeURIComponent(sid) + '&board=' + encodeURIComponent(bid));
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = e => {
+    if (st.dead) return;
+    if (typeof e.data === 'string') { let m; try { m = JSON.parse(e.data); } catch (x) { return; } return liveStatus(st, m); }
+    const buf = new Uint8Array(e.data);
+    let off = 0;
+    while (buf.length - off >= 13) {
+      const dv = new DataView(buf.buffer, buf.byteOffset + off, 13);
+      const kind = dv.getUint8(0), len = dv.getUint32(1), pts = dv.getUint32(5) * 4294967296 + dv.getUint32(9);
+      if (buf.length - off < 13 + len) break;
+      onPacket(st, kind, pts, buf.subarray(off + 13, off + 13 + len));
+      off += 13 + len;
+    }
+  };
+  ws.onclose = () => { if (!st.dead && !st.ended) liveMsg(st, 'Live view ended', 'The connection closed.', true); };
+}
+function setPill(word, cls) { const p = $('#lpill'); if (!p) return; p.className = 'pill ' + (cls || ''); $('#lword').textContent = word; }
+function liveMsg(st, title, sub, again) {
+  if (st.dead) return;
+  const m = $('#lmsg'); if (!m) return;
+  m.hidden = false;
+  m.innerHTML = (again ? '' : '<div class="spin"></div>') + '<b>' + esc(title) + '</b><span>' + esc(sub || '') + '</span>' + (again ? '<button class="btn dark" id="lagain">Try again</button>' : '');
+  if (again) { setPill('Ended', ''); $('#lagain').onclick = () => { stopLive(); liveView(st.sid, st.bid); }; }
+}
+function liveStatus(st, m) {
+  if (m.ch) st.ch = m.ch;
+  if (m.state === 'starting') { setPill('Starting', 'wait'); liveMsg(st, 'Starting live view', 'Asking the site for video.'); }
+  if (m.state === 'waiting') { setPill('Waiting', 'wait'); liveMsg(st, 'Waiting for the hospital', m.message || 'Someone at the hospital is asked to allow this.'); }
+  if (m.state === 'connecting') { setPill('Connecting', 'wait'); liveMsg(st, 'Allowed. Starting video', m.message || ''); }
+  if (m.state === 'live') { setPill('Live', 'on'); if (!st.shown) liveMsg(st, 'Allowed. Starting video', 'The first picture is on its way.'); }
+  if (m.state === 'denied') { st.ended = true; liveMsg(st, 'Live view not allowed', m.message || '', true); }
+  if (m.state === 'error' || m.state === 'ended') { st.ended = true; liveMsg(st, m.state === 'error' ? 'Live view is not available' : 'Live view ended', m.message || '', true); }
+}
+function codecString(name, cfg) {
+  if (name === 'vp8') return 'vp8';
+  if (name === 'vp9') return 'vp09.00.10.08';
+  if (name === 'av1') return 'av01.0.08M.08';
+  if (name === 'h265') return 'hev1.1.6.L120.90';
+  if (cfg) {
+    for (let i = 0; i + 6 < cfg.length; i++) {
+      if (cfg[i] === 0 && cfg[i + 1] === 0 && cfg[i + 2] === 1 && (cfg[i + 3] & 0x1f) === 7) {
+        const hx = v => v.toString(16).padStart(2, '0');
+        return 'avc1.' + hx(cfg[i + 4]) + hx(cfg[i + 5]) + hx(cfg[i + 6]);
+      }
+    }
+  }
+  return 'avc1.42e01f';
+}
+function joinBytes(a, b) { const c = new Uint8Array(a.length + b.length); c.set(a); c.set(b, a.length); return c; }
+function configure(st, codec) {
+  if (!st.dec) st.dec = new VideoDecoder({ output: f => drawFrame(st, f), error: e => { if (!st.dead) liveMsg(st, 'Video could not play', e.message, true); } });
+  st.dec.configure({ codec, optimizeForLatency: true });
+}
+function onPacket(st, kind, pts, data) {
+  if (st.dead) return;
+  if (kind === 1) { try { const m = JSON.parse(new TextDecoder().decode(data)); st.codecName = m.codec || 'h264'; } catch (e) { /* ignore */ } return; }
+  const annexB = st.codecName === 'h264' || st.codecName === 'h265';
+  try {
+    if (kind === 2) { st.cfg = data.slice(); configure(st, codecString(st.codecName, st.cfg)); st.key = false; return; }
+    if (!st.dec || st.dec.state !== 'configured') {
+      if (kind !== 3 || annexB) return;
+      configure(st, codecString(st.codecName, null));
+    }
+    if (kind === 4 && !st.key) return;
+    let bytes = data;
+    if (kind === 3) { st.key = true; if (annexB && st.cfg) bytes = joinBytes(st.cfg, data); }
+    st.dec.decode(new EncodedVideoChunk({ type: kind === 3 ? 'key' : 'delta', timestamp: pts, data: bytes }));
+  } catch (e) { liveMsg(st, 'Video could not play', e.message, true); }
+}
+function drawFrame(st, f) {
+  if (st.dead || LV !== st) { f.close(); return; }
+  const cv = $('#cv'); if (!cv) { f.close(); return; }
+  const w = f.displayWidth, h = f.displayHeight;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  st.ctx.drawImage(f, 0, 0, w, h);
+  f.close();
+  st.w = w; st.h = h;
+  if (!st.shown) { st.shown = true; cv.hidden = false; $('#lmsg').hidden = true; setPill('Live', 'on'); }
+  st.n++;
+  const secs = (performance.now() - st.t0) / 1000;
+  if (secs >= 1.5) { const fe = $('#fps'); if (fe) fe.textContent = w + ' × ' + h + '   ' + Math.round(st.n / secs) + ' frames a second'; st.n = 0; st.t0 = performance.now(); }
+}
+async function snapMode(st, why) {
+  setPill('Pictures', 'wait');
+  liveMsg(st, 'Getting a picture', why);
+  st.snap = true;
+  while (!st.dead) {
+    const r = await api('/api/sites/' + st.sid + '/boards/' + st.bid + '/screen', {});
+    if (st.dead) break;
+    if (!r.ok) { liveMsg(st, 'No picture', r.message || '', true); st.ended = true; break; }
+    const img = $('#snap');
+    img.src = 'data:image/png;base64,' + r.png; img.hidden = false; $('#lmsg').hidden = true;
+    $('#fps').textContent = 'A new picture every few seconds. View only.';
+    await new Promise(res => setTimeout(res, 2500));
+  }
+}
+function sendKey(st, k) {
+  if (st.ws && st.ws.readyState === 1 && st.shown) st.ws.send(JSON.stringify({ t: 'key', key: k }));
+  else api('/api/sites/' + st.sid + '/boards/' + st.bid + '/key', { key: k }).then(r => { if (!r.ok) toast(r.message || 'That did not work.', true); });
+}
+function wireTouch(st, cv) {
+  let down = false, lastMove = 0;
+  const pos = e => {
+    const r = cv.getBoundingClientRect();
+    const w = cv.width, h = cv.height;
+    return { x: Math.max(0, Math.min(w - 1, Math.round((e.clientX - r.left) / r.width * w))), y: Math.max(0, Math.min(h - 1, Math.round((e.clientY - r.top) / r.height * h))), w, h };
+  };
+  const send = (a, e) => { if (st.ws && st.ws.readyState === 1 && st.shown) st.ws.send(JSON.stringify(Object.assign({ t: 'touch', a }, pos(e)))); };
+  cv.addEventListener('pointerdown', e => { if (e.button) return; cv.setPointerCapture(e.pointerId); down = true; send('down', e); e.preventDefault(); });
+  cv.addEventListener('pointermove', e => { if (!down) return; const t = performance.now(); if (t - lastMove < 16) return; lastMove = t; send('move', e); });
+  cv.addEventListener('pointerup', e => {
+    if (!down) return; down = false; send('up', e);
+    const rip = document.createElement('div'); rip.className = 'rip'; rip.style.left = e.clientX + 'px'; rip.style.top = e.clientY + 'px'; document.body.append(rip); setTimeout(() => rip.remove(), 500);
+  });
+  cv.addEventListener('pointercancel', e => { if (down) { down = false; send('up', e); } });
+}
+function stopLive() {
+  const st = LV;
+  if (!st) return;
+  st.dead = true;
+  try { if (st.ws) st.ws.close(); } catch (e) { /* closed */ }
+  try { if (st.dec && st.dec.state !== 'closed') st.dec.close(); } catch (e) { /* closed */ }
+  LV = null;
+  const el = $('#live'); if (el) el.remove();
+  document.body.style.overflow = '';
+}
+
+/* ---------- admin ---------- */
+async function adminView() {
+  const r = await api('/api/admin');
+  if (route.view !== 'admin') return;
+  if (!r.ok) { $('#app').innerHTML = shell('<a class="crumb" href="#/">' + IC.back + 'All sites</a><div class="empty"><b>Admins only</b></div>'); wireShell(); return; }
+  ADMIN = r;
+  const relay = location.origin;
+  const codes = r.codes.map(c => '<div class="row"><div><b class="mono" style="font-family:var(--mono);letter-spacing:.1em">' + esc(c.code) + '</b><span>' + esc(c.name) + ', valid until ' + clock(c.exp) + ' ' + day(c.exp) + '</span></div></div>').join('');
+  const sites = r.sites.map(s => '<div class="row"><div><b>' + esc(s.name) + '</b><span>' + (s.online ? 'Connected' : 'Offline') + (s.version ? ', Board Remote ' + esc(s.version) : '') + ', enrolled ' + (s.enrolled ? day(s.enrolled) : '') + '</span></div><button class="btn sm danger" data-rs="' + s.id + '" data-n="' + esc(s.name) + '">Remove</button></div>').join('');
+  const users = r.users.map(u => '<div class="row"><div><b>' + esc(u.name) + '</b><span>' + (u.role === 'admin' ? 'Admin' : 'Support') + '</span></div>' + (u.name === ME.name ? '<span class="muted" style="font-size:12px">You</span>' : '<button class="btn sm danger" data-ru="' + esc(u.name) + '">Remove</button>') + '</div>').join('');
+  const log = r.audit.map(a => '<div class="ent"><span class="t">' + clock(a.at) + '<br>' + day(a.at) + '</span><div><b>' + esc(a.who || 'System') + '</b> ' + esc(a.what) + (a.site ? ' <span class="m">· ' + esc(a.site) + '</span>' : '') + (a.board ? ' <span class="m">· ' + esc(a.board) + '</span>' : '') + (a.seconds ? ' <span class="m">· ' + a.seconds + ' s</span>' : '') + (a.detail ? '<div class="m">' + esc(a.detail) + '</div>' : '') + (a.ok === false ? ' <span class="chip bad">failed</span>' : '') + '</div></div>').join('');
+  $('#app').innerHTML = shell('<a class="crumb" href="#/">' + IC.back + 'All sites</a><div class="headrow"><h1 class="title">Admin</h1></div><div class="agrid">' +
+    '<section class="card"><h2>Connect a hospital</h2><p class="sub">Makes a one time code, good for 24 hours. At the hospital, open Board Remote, Remote, and enter this relay address and the code.</p>' +
+    '<form class="inline" id="cf"><div class="field"><label for="cn">Site name</label><input id="cn" placeholder="Ball Health" maxlength="60"></div><button class="btn dark" type="submit">Make code</button></form>' +
+    '<div id="newcode"></div>' + (codes ? '<div><div class="label" style="margin-bottom:4px">Codes not used yet</div><div class="rows">' + codes + '</div></div>' : '') + '</section>' +
+    '<section class="card"><h2>Sites</h2><div class="rows">' + (sites || '<p class="muted">None yet.</p>') + '</div></section>' +
+    '<section class="card"><h2>People</h2><div class="rows">' + users + '</div><form id="uf" style="display:grid;gap:10px"><div class="label">Add a person</div><div class="field"><label for="un">Name</label><input id="un" autocapitalize="none" spellcheck="false" placeholder="first.last"></div>' +
+    '<div class="field"><label for="up">Password, 10 characters or more</label><input id="up" type="password" autocomplete="new-password"></div><div class="field"><label for="ur">Role</label><select id="ur"><option value="support">Support: sites and boards</option><option value="admin">Admin: also sites, people, activity</option></select></div><button class="btn" type="submit">Add</button></form></section>' +
+    '<section class="card wide"><h2>Activity</h2><p class="sub">Every sign in, request and action, newest first.</p><div class="log">' + (log || '<p class="muted">Nothing yet.</p>') + '</div></section></div>');
+  wireShell();
+  $('#cf').onsubmit = async e => {
+    e.preventDefault();
+    const x = await api('/api/admin/code', { name: $('#cn').value });
+    if (!x.ok) return toast(x.message, true);
+    $('#newcode').innerHTML = '<div class="codebox"><div class="label" style="color:#bdb8ae">Code for ' + esc(x.name) + '</div><div class="c">' + esc(x.code) + '</div><div class="s">In Board Remote at the hospital: Remote, relay address <code>' + esc(relay) + '</code>, then this code. It works once, until ' + clock(x.exp) + ' tomorrow.</div></div>';
+    $('#cn').value = '';
+  };
+  $('#uf').onsubmit = async e => {
+    e.preventDefault();
+    const x = await api('/api/admin/user', { name: $('#un').value, pass: $('#up').value, role: $('#ur').value });
+    toast(x.message, !x.ok);
+    if (x.ok) adminView();
+  };
+  document.querySelectorAll('[data-rs]').forEach(b => b.onclick = async () => {
+    if (!confirm('Remove ' + b.dataset.n + '? Its Board Remote is disconnected and cannot connect again without a new code.')) return;
+    const x = await api('/api/admin/site/' + b.dataset.rs + '/remove', {}); toast(x.message, !x.ok); adminView();
+  });
+  document.querySelectorAll('[data-ru]').forEach(b => b.onclick = async () => {
+    if (!confirm('Remove ' + b.dataset.ru + '?')) return;
+    const x = await api('/api/admin/user/' + encodeURIComponent(b.dataset.ru) + '/remove', {}); toast(x.message, !x.ok); adminView();
+  });
+}
+function passDialog() {
+  const scrim = document.createElement('div'); scrim.className = 'scrim'; scrim.id = 'pscrim';
+  scrim.innerHTML = '<form class="sheet" id="pf"><div class="hd"><h2>Change password</h2><button class="x" type="button" id="px" aria-label="Close">' + IC.x + '</button></div>' +
+    '<div class="field"><label for="po">Current password</label><input id="po" type="password" autocomplete="current-password"></div>' +
+    '<div class="field"><label for="pn">New password, 10 characters or more</label><input id="pn" type="password" autocomplete="new-password"></div><div class="err" id="perr"></div><button class="btn dark" type="submit">Change password</button></form>';
+  document.body.append(scrim);
+  $('#px').onclick = () => scrim.remove();
+  $('#pf').onsubmit = async e => {
+    e.preventDefault();
+    const x = await api('/api/password', { old: $('#po').value, pass: $('#pn').value });
+    if (!x.ok) { $('#perr').textContent = x.message; return; }
+    scrim.remove(); toast(x.message);
+  };
+}
+
+/* ---------- routing and refresh ---------- */
+function every(fn, ms) { stopTimer(); timer = setTimeout(() => { if (document.hidden) return every(fn, ms); fn(); }, ms); }
+function stopTimer() { clearTimeout(timer); timer = null; }
+async function route() {
+  if (!ME) {
+    const r = await fetch('/api/me', { cache: 'no-store', credentials: 'same-origin' }).then(x => x.json()).catch(() => ({}));
+    if (!r.ok) { route.view = 'login'; stopLive(); return loginView(); }
+    ME = { name: r.name, role: r.role };
+  }
+  const h = location.hash || '#/';
+  let m;
+  if ((m = /^#\/s\/([a-f0-9]{8})\/live\/([a-f0-9]{8})$/.exec(h))) {
+    if (!SITE || SITE.site.id !== m[1]) { const r = await api('/api/sites/' + m[1]); if (r.ok) SITE = r; }
+    route.view = 'live'; route.site = m[1];
+    stopLive(); return liveView(m[1], m[2]);
+  }
+  stopLive();
+  if ((m = /^#\/s\/([a-f0-9]{8})(?:\/b\/([a-f0-9]{8}))?$/.exec(h))) {
+    const same = route.view === 'site' && route.site === m[1];
+    route.view = 'site'; route.site = m[1]; route.board = m[2] || null;
+    if (same && SITE && SITE.site.id === m[1]) { if (m[2]) openBoard(m[2]); else { const s = $('#scrim'); if (s) s.remove(); } return; }
+    const s = $('#scrim'); if (s) s.remove();
+    return siteView(m[1], m[2]);
+  }
+  const s = $('#scrim'); if (s) s.remove();
+  if (h === '#/admin') { route.view = 'admin'; stopTimer(); return adminView(); }
+  route.view = 'fleet';
+  return fleetView();
+}
+window.addEventListener('hashchange', route);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && route.view === 'fleet') fleetView(); });
+/* deep link: a direct visit to /s/<id> (the Hub's Board Remote button) opens that site, through sign in */
+(function () { if (location.hash) return; var p = location.pathname; if (/^\/s\/[a-f0-9]{8}(?:\/(?:b|live)\/[a-f0-9]{8})?$/.test(p)) { try { history.replaceState(null, '', '/#' + p); } catch (e) { location.hash = '#' + p; } } })();
+route();
+</script>
+</body>
+</html>

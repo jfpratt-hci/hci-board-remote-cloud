@@ -12,11 +12,11 @@ global.T = T;
   const psql = s => execSync(process.env.PGHOST ? 'psql -q -v ON_ERROR_STOP=1 ' + s : 'su postgres -c ' + JSON.stringify('psql -q -v ON_ERROR_STOP=1 ' + s), { stdio: 'pipe' });
   const db = require('../src/db');
   const only = process.argv[2];
-  for (const name of ['db', 'auth', 'agent', 'stress', 'api', 'aztoken']) {
+  for (const name of ['db', 'auth', 'agent', 'stress', 'api', 'aztoken', 'updates']) {
     if (only && only !== name) continue;
     let f; try { f = require('./' + name + '.test.js'); } catch (e) { if (e.code === 'MODULE_NOT_FOUND') continue; throw e; }
     // each file gets a fresh database, built the same way production is: bootstrap, then migrations
-    if (db.pool) await db.pool.end();
+    if (db.pool && !db.pool.ended && !db.pool.ending) await db.pool.end().catch(() => {});
     psql("-c 'drop database if exists brtest' -c 'create database brtest'");
     psql("-d brtest -v owner_pw=ownerpw -v app_pw=apppw -f " + JSON.stringify(path.join(__dirname, '..', 'db', 'bootstrap.sql')));
     psql("-d brtest -c 'alter database brtest owner to br_owner'");

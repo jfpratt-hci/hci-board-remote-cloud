@@ -1,0 +1,130 @@
+# Builds Board Remote for Windows: the signed update package and the installer.
+#   1. package (Linux): signs board-remote with HCI's release key, read from Key Vault for this run
+#      only. The private key never lands in the repo, in logs, or in an artifact.
+#   2. installer (Windows): Node, the service (WinSW + supervisor), this version, scrcpy and adb,
+#      built with Inno Setup into HCI-ONE-Board-Remote-Setup-<version>.exe.
+#   3. a GitHub release board-remote-v<version> with the installer, the package and its .sig.
+#      Upload the .zip and .sig on the cloud's Updates page to send the version to PCs.
+# The installer is not code signed yet. When HCI has a code signing certificate, set the repo
+# variable CODESIGN_ENABLED=true and add its secrets; the sign step below is ready for it.
+name: windows
+on:
+  push:
+    branches: [main]
+    paths: ['board-remote/**', 'installer/**', 'scripts/package.js', '.github/workflows/windows.yml']
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: write
+concurrency: windows-build
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and sign the package
+        id: pkg
+        run: |
+          umask 077
+          KEY="$RUNNER_TEMP/release.pem"
+          az keyvault secret show --vault-name "${{ vars.KEY_VAULT || 'hcione-boardremote-kv' }}" -n br-release-signing-key --query value -o tsv > "$KEY"
+          openssl pkey -in "$KEY" -pubout > board-remote/service/release-key.pub
+          BR_RELEASE_SIGNING_KEY_FILE="$KEY" node scripts/package.js --sign
+          rm -f "$KEY"
+          V=$(node -e "console.log(require('./scripts/package').version())")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          # check the signature with the public key alone, the way a PC does
+          node -e "
+            const fs=require('fs'),c=require('crypto'),v='$V';
+            const z=fs.readFileSync('dist/board-remote-'+v+'.zip'),s=c.createHash('sha256').update(z).digest('hex');
+            const ok=c.verify(null,Buffer.from('HCI-ONE-BOARD-REMOTE|'+v+'|'+s),c.createPublicKey(fs.readFileSync('board-remote/service/release-key.pub')),Buffer.from(fs.readFileSync('dist/board-remote-'+v+'.sig','utf8').trim(),'base64'));
+            if(!ok){console.error('signature check failed');process.exit(1)} console.log('signature ok, sha256',s)"
+          cp board-remote/service/release-key.pub dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: |
+            dist/board-remote-*.zip
+            dist/board-remote-*.sig
+            dist/release-key.pub
+
+  installer:
+    needs: package
+    runs-on: windows-latest
+    env:
+      V: ${{ needs.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: package, path: dist }
+      - name: Stage the files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'
+          $S = 'build\win'
+          New-Item -ItemType Directory -Force -Path "$S\versions\$env:V", "$S\service", "$S\node", "$S\bundled\scrcpy", 'build\dl' | Out-Null
+          Expand-Archive "dist\board-remote-$env:V.zip" -DestinationPath "$S\versions\$env:V" -Force
+          Copy-Item "$S\versions\$env:V\service\supervisor.js" "$S\service\"
+          Copy-Item 'dist\release-key.pub' "$S\service\release-key.pub"
+          Copy-Item 'installer\BoardRemoteService.xml' "$S\service\"
+          Copy-Item 'installer\setup-data.ps1', 'installer\open-board-remote.vbs' $S
+          Copy-Item 'board-remote\board_remote.ico' $S
+          # WinSW, pinned
+          Invoke-WebRequest 'https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe' -OutFile "$S\service\BoardRemoteService.exe"
+          # Node, the current LTS
+          $lts = (Invoke-RestMethod 'https://nodejs.org/dist/index.json') | Where-Object { $_.lts } | Select-Object -First 1
+          Invoke-WebRequest "https://nodejs.org/dist/$($lts.version)/win-x64/node.exe" -OutFile "$S\node\node.exe"
+          "Node $($lts.version)" | Out-File "$S\node\VERSION.txt"
+          # scrcpy (brings adb), the latest release
+          $rel = Invoke-RestMethod 'https://api.github.com/repos/Genymobile/scrcpy/releases/latest' -Headers @{ 'User-Agent' = 'HCI-Board-Remote-CI' }
+          $asset = $rel.assets | Where-Object { $_.name -like 'scrcpy-win64-*.zip' } | Select-Object -First 1
+          Invoke-WebRequest $asset.browser_download_url -OutFile 'build\dl\scrcpy.zip'
+          Expand-Archive 'build\dl\scrcpy.zip' -DestinationPath 'build\dl\scrcpy' -Force
+          $inner = (Get-ChildItem 'build\dl\scrcpy' -Recurse -Filter scrcpy.exe | Select-Object -First 1).Directory.FullName
+          Copy-Item "$inner\*" "$S\bundled\scrcpy" -Recurse
+          Get-ChildItem $S -Recurse | Measure-Object -Property Length -Sum | ForEach-Object { "Staged $($_.Count) files, $([math]::Round($_.Sum/1MB,1)) MB" }
+      - name: Check the service starts Board Remote
+        shell: pwsh
+        run: |
+          $env:BR_DATA_DIR = "$env:RUNNER_TEMP\brdata"; $env:BOARD_REMOTE_PORT = '7755'; $env:BR_UPDATE_FIRST_MS = '600000'
+          $p = Start-Process -FilePath 'build\win\node\node.exe' -ArgumentList '"build\win\service\supervisor.js"' -PassThru -WindowStyle Hidden
+          $ok = $false
+          for ($i = 0; $i -lt 40; $i++) { try { $r = Invoke-RestMethod 'http://127.0.0.1:7755/api/ping' -TimeoutSec 2; if ($r.version -eq $env:V -and $r.service) { $ok = $true; break } } catch {}; Start-Sleep 1 }
+          Stop-Process -Id $p.Id -Force; Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $ok) { Get-Content "$env:BR_DATA_DIR\logs\*.log" -ErrorAction SilentlyContinue; throw 'Board Remote did not answer under the service' }
+          "Board Remote $env:V answered under the service"
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DAppVersion=$env:V" "/DStage=..\build\win" 'installer\BoardRemote.iss'
+          if ($LASTEXITCODE) { throw "Inno Setup failed: $LASTEXITCODE" }
+      - name: Code sign (when a certificate is set up)
+        if: vars.CODESIGN_ENABLED == 'true'
+        shell: pwsh
+        run: |
+          # Fill in with the certificate provider's signing step (for example Azure Trusted Signing or a
+          # DigiCert KeyLocker HSM) and sign dist\HCI-ONE-Board-Remote-Setup-$env:V.exe
+          throw 'Code signing is enabled but no signing step is configured yet.'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/HCI-ONE-Board-Remote-Setup-*.exe
+      - name: Publish a GitHub release
+        shell: pwsh
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          $tag = "board-remote-v$env:V"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) { "Release $tag already exists; files are in this run's artifacts."; exit 0 }
+          gh release create $tag "dist\HCI-ONE-Board-Remote-Setup-$env:V.exe" "dist\board-remote-$env:V.zip" "dist\board-remote-$env:V.sig" --title "Board Remote $env:V" --notes "Installer for new PCs, and the signed update package (.zip and .sig) to upload on the cloud's Updates page." --target $env:GITHUB_SHA

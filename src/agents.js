@@ -296,7 +296,7 @@ function create(log) {
     for (const r of rows) send(k, { t: 'command', id: r.id, action: r.action, args: r.args });
   }
 
-  return { upgrade, enroll, makeCode, revoke, command, hospitalCommand, fanOut, isOnline: id => conns.has(id), onEvent: fn => { listeners.add(fn); return () => listeners.delete(fn); }, ACTIONS: Object.keys(ACTIONS), ACTS, _conns: conns };
+  return { upgrade, authAgent, emit, enroll, makeCode, revoke, command, hospitalCommand, fanOut, isOnline: id => conns.has(id), onEvent: fn => { listeners.add(fn); return () => listeners.delete(fn); }, ACTIONS: Object.keys(ACTIONS), ACTS, _conns: conns };
 }
 
 module.exports = { create, normCode, PROTO };

@@ -1,0 +1,22 @@
+<!-- WinSW: runs the Board Remote supervisor as a Windows service. %BASE% is this folder. -->
+<service>
+  <id>HCIOneBoardRemote</id>
+  <name>HCI ONE Board Remote</name>
+  <description>Keeps every HCI ONE board connected, watches their health, and keeps Board Remote up to date from HCI ONE Cloud.</description>
+  <executable>%BASE%\..\node\node.exe</executable>
+  <arguments>"%BASE%\supervisor.js"</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <env name="BR_DATA_DIR" value="%ProgramData%\HCI ONE\Board Remote"/>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>20 sec</stoptimeout>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <logpath>%ProgramData%\HCI ONE\Board Remote\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>2048</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+</service>

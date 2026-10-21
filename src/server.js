@@ -9,6 +9,7 @@
      SESSION_SECRET        long random string
      BR_BOOTSTRAP_ADMIN    email of the first HCI admin (only used while no HCI admin exists)
      PORT                  default 8080
+     BR_RELEASE_PUBKEY     HCI's Board Remote release public key (ed25519, PEM or 32 base64 bytes)
      BR_DEV_LOGIN=1        local testing only: sign in by email from this machine */
 const http = require('http');
 const fs = require('fs');
@@ -17,8 +18,9 @@ const db = require('./db');
 const Auth = require('./auth');
 const Agents = require('./agents');
 const Api = require('./api');
+const Updates = require('./updates');
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const PUB = path.join(__dirname, '..', 'public');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 const SEC = {
@@ -37,12 +39,13 @@ function start(env) {
   const auth = Auth.create({ publicUrl: env.PUBLIC_URL, clientId: env.ENTRA_CLIENT_ID || 'dev', clientSecret: env.ENTRA_CLIENT_SECRET || '', hciTenantId: env.HCI_TENANT_ID || '',
     sessionSecret: env.SESSION_SECRET, bootstrapAdmin: env.BR_BOOTSTRAP_ADMIN || '', devLogin: env.BR_DEV_LOGIN === '1' });
   const agents = Agents.create(log);
-  const api = Api.create(agents);
+  const updates = Updates.create({ publicKey: env.BR_RELEASE_PUBKEY, agents });
+  const api = Api.create(agents, updates);
 
   const json = (res, code, obj) => { res.writeHead(code, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, SEC)); res.end(JSON.stringify(obj)); };
-  const readBody = req => new Promise((resolve, reject) => {
+  const readBody = (req, max) => new Promise((resolve, reject) => {
     let n = 0; const chunks = [];
-    req.on('data', d => { n += d.length; if (n > 1024 * 1024) { reject(Object.assign(new Error('Too large'), { status: 413 })); req.destroy(); } else chunks.push(d); });
+    req.on('data', d => { n += d.length; if (n > (max || 1024 * 1024)) { reject(Object.assign(new Error('Too large'), { status: 413 })); req.destroy(); } else chunks.push(d); });
     req.on('end', () => { if (!n) return resolve({}); try { resolve(JSON.parse(Buffer.concat(chunks).toString())); } catch (e) { reject(Object.assign(new Error('Bad JSON'), { status: 400 })); } });
     req.on('error', reject);
   });
@@ -57,6 +60,21 @@ function start(env) {
       if (p === '/api/agent/enroll' && req.method === 'POST') {
         const b = await readBody(req);
         return json(res, 200, await agents.enroll(b.code, b.pcName, b.version));
+      }
+      // Board Remote PCs asking for program updates, with their own agent credential
+      if (p.startsWith('/api/agent/')) {
+        const a = await agents.authAgent(req);
+        if (!a) return json(res, 401, { ok: false, message: 'This Board Remote is not enrolled, or was removed.' });
+        if (p === '/api/agent/update' && req.method === 'GET') return json(res, 200, await updates.check(a, url.searchParams));
+        if (p === '/api/agent/update-status' && req.method === 'POST') return json(res, 200, await updates.status(a, await readBody(req)));
+        const fm = req.method === 'GET' && /^\/api\/agent\/releases\/([0-9a-f-]{36})\/package$/.exec(p);
+        if (fm) {
+          const f = await updates.file(a, fm[1]);
+          if (!f) return json(res, 404, { ok: false, message: 'That release is not for this PC.' });
+          res.writeHead(200, Object.assign({ 'Content-Type': 'application/zip', 'Content-Length': f.package.length, 'Content-Disposition': 'attachment; filename="board-remote-' + f.version + '.zip"' }, SEC));
+          return res.end(f.package);
+        }
+        return json(res, 404, { ok: false, message: 'Not found' });
       }
       if (p.startsWith('/api/')) {
         const A = await auth.actorFor(req);
@@ -80,7 +98,7 @@ function start(env) {
           req.on('close', () => { off(); clearInterval(ping); if (pend) clearTimeout(pend); });
           return;
         }
-        const body = req.method === 'GET' ? {} : await readBody(req);
+        const body = req.method === 'GET' ? {} : await readBody(req, p === '/api/releases' ? 80 * 1024 * 1024 : 0);
         const out = await api.handle(req, res, url, A, body);
         if (out === undefined) return json(res, 404, { ok: false, message: 'Not found' });
         return json(res, out.ok === false ? 400 : 200, out);
