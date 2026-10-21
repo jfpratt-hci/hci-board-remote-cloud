@@ -52,6 +52,11 @@ DEP_OID=$(q identity show -n id-br-deploy -g $RG --query principalId)
 az identity federated-credential show --name github-main --identity-name id-br-deploy -g $RG -o none 2>/dev/null || \
   az identity federated-credential create --name github-main --identity-name id-br-deploy -g $RG \
     --issuer https://token.actions.githubusercontent.com --subject "repo:$REPO:ref:refs/heads/main" --audiences api://AzureADTokenExchange -o none
+# GitHub now sends the subject with owner and repo IDs (immutable form), so trust that one too.
+REPO_IDS=${REPO_IDS:-"jfpratt-hci@276364806/hci-board-remote-cloud@1427572918"}
+az identity federated-credential show --name github-main-ids --identity-name id-br-deploy -g $RG -o none 2>/dev/null || \
+  az identity federated-credential create --name github-main-ids --identity-name id-br-deploy -g $RG \
+    --issuer https://token.actions.githubusercontent.com --subject "repo:$REPO_IDS:ref:refs/heads/main" --audiences api://AzureADTokenExchange -o none
 role "$DEP_OID" ServicePrincipal AcrPush "$ACRID"
 role "$DEP_OID" ServicePrincipal Contributor "$APPRES"
 role "$DEP_OID" ServicePrincipal Reader "$(q group show -n $RG --query id)"
