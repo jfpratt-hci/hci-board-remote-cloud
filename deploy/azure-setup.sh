@@ -75,8 +75,10 @@ az containerapp update -n $APP -g $RG --min-replicas 1 --max-replicas 1 --cpu 0.
   SESSION_SECRET=secretref:session-secret ENTRA_CLIENT_SECRET=secretref:entra-client-secret
 
 echo "6/7 Database: open only to the app (and this shell for a minute), then make the two roles"
-i=0; for ip in $(q containerapp show -n $APP -g $RG --query "properties.outboundIpAddresses"); do
-  i=$((i+1)); az postgres flexible-server firewall-rule create -g $RG --server-name $PG --name "app-$i" --start-ip-address "$ip" --end-ip-address "$ip" -o none
+HAVE=" $(q postgres flexible-server firewall-rule list -g $RG --server-name $PG --query "[].startIpAddress" | tr '\n' ' ') "
+i=0; for ip in $(q containerapp show -n $APP -g $RG --query "properties.outboundIpAddresses" | tr ',' ' '); do
+  i=$((i+1)); case "$HAVE" in *" $ip "*) continue;; esac
+  az postgres flexible-server firewall-rule create -g $RG --server-name $PG --name "app-$i" --start-ip-address "$ip" --end-ip-address "$ip" -o none
 done
 MYIP=$(curl -s https://api.ipify.org)
 az postgres flexible-server firewall-rule create -g $RG --server-name $PG --name cloudshell-temp --start-ip-address "$MYIP" --end-ip-address "$MYIP" -o none
