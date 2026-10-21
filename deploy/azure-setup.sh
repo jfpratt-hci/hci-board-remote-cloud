@@ -70,11 +70,11 @@ retry az containerapp secret set -n $APP -g $RG --secrets \
 
 echo "5/7 Container app settings: port 8080, exactly one copy, Microsoft sign in"
 FQDN=$(q containerapp show -n $APP -g $RG --query properties.configuration.ingress.fqdn)
-az ad app update --id $ENTRA_APP --web-redirect-uris "https://boardremote.hci-tv.com/auth/callback" "https://$FQDN/auth/callback"
+az ad app update --id $ENTRA_APP --web-redirect-uris "https://remote.hci-tv.com/auth/callback" "https://$FQDN/auth/callback"
 az containerapp ingress update -n $APP -g $RG --target-port 8080 --transport auto -o none
 DBH=$PG.postgres.database.azure.com
 az containerapp update -n $APP -g $RG --min-replicas 1 --max-replicas 1 --cpu 0.5 --memory 1Gi -o none --set-env-vars \
-  "PUBLIC_URL=https://$FQDN" "ENTRA_CLIENT_ID=$ENTRA_APP" "HCI_TENANT_ID=$TENANT" "BR_BOOTSTRAP_ADMIN=$ADMIN" PORT=8080 \
+  "PUBLIC_URL=https://remote.hci-tv.com" "ENTRA_CLIENT_ID=$ENTRA_APP" "HCI_TENANT_ID=$TENANT" "BR_BOOTSTRAP_ADMIN=$ADMIN" PORT=8080 \
   "DATABASE_URL=postgres://br_app@$DBH:5432/boardremote" "DATABASE_URL_OWNER=postgres://br_owner@$DBH:5432/boardremote" \
   "DB_IDENTITY_APP=$APP_CID" "DB_IDENTITY_OWNER=$OWNER_CID" \
   SESSION_SECRET=secretref:session-secret ENTRA_CLIENT_SECRET=secretref:entra-client-secret
@@ -108,4 +108,4 @@ echo "  AZURE_SUBSCRIPTION_ID=$SUB"
 echo "  ACR_NAME=$ACR"
 echo "  RESOURCE_GROUP=$RG"
 echo "  CONTAINER_APP=$APP"
-echo "Cloud address until boardremote.hci-tv.com is set up: https://$FQDN"
+echo "Cloud address: https://remote.hci-tv.com (backup: https://$FQDN)"

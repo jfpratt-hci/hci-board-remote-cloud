@@ -3,7 +3,7 @@
    Environment:
      DATABASE_URL          postgres://br_app:...@host/db?sslmode=require   (the service role)
      DATABASE_URL_OWNER    postgres://br_owner:...  (only to run migrations at start; optional)
-     PUBLIC_URL            https://boardremote.hci-tv.com
+     PUBLIC_URL            https://remote.hci-tv.com
      ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET   the multi tenant app registration
      HCI_TENANT_ID         HCI's own Microsoft tenant
      SESSION_SECRET        long random string

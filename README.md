@@ -49,7 +49,7 @@ Tests: `npm test` (93, token sign in, database, sign in, agent link, concurrency
 |---|---|
 | `DATABASE_URL` | as `br_app` |
 | `DATABASE_URL_OWNER` | as `br_owner`; if set, migrations run at start |
-| `PUBLIC_URL` | `https://boardremote.hci-tv.com` |
+| `PUBLIC_URL` | `https://remote.hci-tv.com` |
 | `SESSION_SECRET` | 32+ random bytes |
 | `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET` | the app registration |
 | `HCI_TENANT_ID` | HCI's Microsoft tenant |
@@ -57,10 +57,10 @@ Tests: `npm test` (93, token sign in, database, sign in, agent link, concurrency
 
 ## Azure (created 20 Oct 2026; wiring: `deploy/azure-setup.sh` in Cloud Shell)
 
-1. **Entra app registration: done 20 Oct 2026.** "HCI ONE Board Remote Cloud" in HCI's tenant (e55dab1c-8b8f-4c0b-bb05-f0fb52f04e62), client ID 3410a8c2-8e42-4156-835e-66ce79e7da6d, multiple organizations limited to allowed tenants (hci-tv.com so far), redirect `https://boardremote.hci-tv.com/auth/callback`. Non secret settings are in `deploy.env`. The client secret is made at step 3 straight into Key Vault. Each new hospital: add its tenant to the allowed list, and its admin grants consent once (the app has no verified publisher yet).
+1. **Entra app registration: done 20 Oct 2026.** "HCI ONE Board Remote Cloud" in HCI's tenant (e55dab1c-8b8f-4c0b-bb05-f0fb52f04e62), client ID 3410a8c2-8e42-4156-835e-66ce79e7da6d, multiple organizations limited to allowed tenants (hci-tv.com so far), redirect `https://remote.hci-tv.com/auth/callback`. Non secret settings are in `deploy.env`. The client secret is made at step 3 straight into Key Vault. Each new hospital: add its tenant to the allowed list, and its admin grants consent once (the app has no verified publisher yet).
 2. **Two managed identities**, id-br-owner (migrations) and id-br-app (the service), then **Azure Database for PostgreSQL, Flexible Server** with Microsoft Entra sign in only (no passwords), TLS required, backups 35 days, firewall allows Azure services only (Container Apps uses 50+ shared outbound addresses), sign in still needs the app identity. Run `db/bootstrap_entra.sql` once from Cloud Shell; it binds the roles br_owner and br_app to the two identities. The service then signs in with tokens (`DB_IDENTITY_APP`, `DB_IDENTITY_OWNER`, see `src/aztoken.js`).
 3. **Key Vault** for the session secret and the Microsoft client secret (there are no database passwords).
 4. **Container Apps**: this `Dockerfile`, ingress 443 with WebSockets on, exactly 1 replica (min 1, max 1: PC connections are held in memory, so a second replica needs Postgres LISTEN/NOTIFY first), secrets from Key Vault, health probe `/healthz`.
-5. DNS `boardremote.hci-tv.com` and a managed certificate.
+5. **DNS: done 21 Oct 2026.** GoDaddy CNAME `remote` to the app, TXT `asuid.remote` for verification, Azure managed certificate (renews itself). The old relay address moved off this name.
 
 Live screens through the cloud (streamed from the PC on demand, never stored) are the next phase.
