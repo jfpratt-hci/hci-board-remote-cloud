@@ -26,6 +26,7 @@ const STATES = ['online', 'late', 'degraded', 'offline', 'unknown', 'paused'];
 const clip = (v, n) => String(v === undefined || v === null ? '' : v).slice(0, n);
 const normCode = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
+const PC_ALERT_MS = Number(process.env.BR_PC_ALERT_MS) || 120000;
 function create(log) {
   log = log || (() => {});
   const conns = new Map();        // agentId -> { sock, hospitalId, actor }
@@ -112,6 +113,17 @@ function create(log) {
         where s.by_agent = $1 and not exists (select 1 from br.device_reach r where r.device_id = s.device_id and r.online)`, [agentId]);
     });
     emit(hospitalId, { t: 'fleet' });
+    // a PC that restarts is back within a minute; one still gone after PC_ALERT_MS gets an alert
+    setTimeout(() => { if (!conns.has(agentId)) pcAlert(agentId, hospitalId).catch(e => log('pc alert', e.message)); }, PC_ALERT_MS).unref();
+  }
+  async function pcAlert(agentId, hospitalId) {
+    await db.tx({ kind: 'agent', agentId }, async c => {
+      const a = (await c.query('select name, revoked_at from br.agents where id = $1', [agentId])).rows[0];
+      if (!a || a.revoked_at) return;
+      const open = (await c.query("select 1 from br.alerts where agent_id = $1 and kind = 'pc_offline' and resolved_at is null", [agentId])).rowCount;
+      if (!open) await c.query("insert into br.alerts (hospital_id, agent_id, kind, title) values ($1, $2, 'pc_offline', $3)", [hospitalId, agentId, a.name + ' lost its connection']);
+    });
+    emit(hospitalId, { t: 'fleet' });
   }
 
   /* ---------- messages from Board Remote ---------- */
@@ -121,6 +133,7 @@ function create(log) {
       const boards = Array.isArray(msg.boards) ? msg.boards.slice(0, 2000) : [];
       const fixes = await db.tx(A, async c => {
         await c.query('update br.agents set last_seen = now(), version = $2, pc_name = case when $3 <> \'\' then $3 else pc_name end where id = $1', [agentId, clip(msg.version, 20), clip(msg.pcName, 80)]);
+        await c.query("update br.alerts set resolved_at = now() where agent_id = $1 and kind = 'pc_offline' and resolved_at is null", [agentId]);
         const out = [];
         const keep = [];
         boards.sort((x, y) => String(identityOf(x) || '').localeCompare(String(identityOf(y) || '')));

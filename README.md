@@ -65,6 +65,14 @@ Tests: `npm test` (126: token sign in, database, sign in, agent link, concurrenc
 
 6. **Release signing key: done 21 Oct 2026.** ed25519, private key only in Key Vault (`br-release-signing-key`), readable by the GitHub build identity alone; its public half is the app setting `BR_RELEASE_PUBKEY` and ships inside every Board Remote install.
 
+## Dashboard and reports (0.3.0)
+- **Dashboard** (the first page): boards up now, offline now, uptime, open alerts and PCs connected; downtime by day; worst units or hospitals; the boards with the most downtime; open alerts with Acknowledge.
+- **Reports**: Uptime, Alerts and response, Inventory, Support activity. Each downloads as CSV, and Print or save PDF gives a one hospital report to send.
+- **Filters** for both: hospital (HCI sees All hospitals), device type, floor, unit, closet, Board Remote PC, and a date range.
+- **Where the numbers come from**: `br.state_log`, written by a database trigger whenever a board's state changes. Uptime = up / (up + offline); time nobody could watch a board (its PC offline, or paused) does not count either way. History starts when 0.3.0 goes live.
+- **Alerts**: a board going offline opens one and coming back closes it (same trigger). A PC gone more than 2 minutes opens one, closed when it reconnects. Acknowledging is in the audit log.
+- **Floor**: worked out from the room number (401 is floor 4, 1205 is floor 12), or typed on the board in the cloud. Cloud only; Board Remote PCs keep room, unit and closet.
+
 ## Board Remote for Windows and its updates
 
 This repo also holds Board Remote itself (`board-remote/`) and its Windows installer (`installer/`).

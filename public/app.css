@@ -175,3 +175,91 @@ body.dopen main{margin-right:416px}
 #v-pcs .panel:first-child{grid-template-rows:auto auto minmax(0,1fr)}
 #v-upd .panel:first-child{grid-template-rows:auto minmax(0,auto) auto minmax(0,1fr)}
 #v-upd .panel:first-child .tablewrap:first-of-type{max-height:42vh}
+
+/* filters, shared by the dashboard and reports */
+#v-dash,#v-rep{grid-template-rows:auto minmax(0,1fr)}
+.fbar{background:var(--card);border-radius:var(--r);padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fbar .label{margin-right:4px}
+.fbar .show{max-width:200px}
+.fbar .show.on{background:var(--ink);color:#fff}
+.fbar input[type=date]{height:40px;border-radius:12px;border:0;background:var(--soft);padding:0 10px;font:700 13px var(--font);color:var(--ink)}
+.fbar .grow{flex:1}
+.fbar .btn{height:40px}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:var(--soft);gap:2px;flex-wrap:wrap}
+.seg button{height:32px;padding:0 12px;border-radius:9px;font-weight:800;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(30,28,25,.12)}
+
+/* dashboard */
+.dash{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:var(--g)}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--g)}
+.kpi{background:var(--card);border-radius:var(--r);padding:14px 16px;display:grid;gap:4px;align-content:start}
+.kpi .v{font-size:30px;font-weight:800;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:15px;font-weight:700;color:var(--muted);letter-spacing:0}
+.kpi .s{font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.kpi .s .d{width:8px;height:8px;border-radius:50%;background:var(--grey)}
+.kpi.ok .s .d{background:var(--green)} .kpi.bad .s .d{background:var(--red)} .kpi.warn .s .d{background:var(--amber)}
+.kpi.bad .v{color:var(--red)}
+.dgrid{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(320px,.85fr);grid-template-rows:minmax(0,.9fr) minmax(0,1fr);gap:var(--g)}
+.dgrid .cpanel{grid-column:1/3}
+.dgrid .apanel{grid-column:3;grid-row:1/3}
+.dgrid .panel{padding:14px 16px;gap:10px}
+.dgrid .phead h2{font-size:15px;margin:0 0 2px}
+.dgrid .phead .sub{font-size:12px}
+.chart{min-height:0;position:relative}
+.chart svg{width:100%;height:100%;display:block;overflow:visible}
+.chart svg *{stroke:none}
+.chart svg .grid{stroke:var(--line);stroke-width:1}
+.chart .ax{font:600 11px var(--font);fill:var(--muted)}
+.chart .bar{fill:var(--red)}
+.chart .bar.zero{fill:var(--green)}
+.chart .hit{fill:transparent;cursor:default}
+.chart .hit:hover + .bar,.chart g:hover .bar{opacity:.8}
+.chart .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.tip{position:fixed;z-index:60;pointer-events:none;background:var(--ink);color:#fff;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:600;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap}
+.tip b{font-weight:800}
+.tbl tr.click{cursor:pointer}
+.tbl tr.click:hover td{background:var(--soft)}
+.tbl td.n,.tbl th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.meter{display:inline-grid;grid-template-columns:56px auto;gap:8px;align-items:center}
+.meter i{display:block;height:6px;border-radius:3px;background:var(--grey-bg);overflow:hidden;position:relative}
+.meter i b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--green)}
+.meter.warn i b{background:var(--amber)} .meter.bad i b{background:var(--red)}
+.alist{min-height:0;overflow:auto;display:grid;gap:8px;align-content:start}
+.al{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;background:var(--soft);border-radius:12px;padding:10px 12px}
+.al .t{font-weight:800;font-size:13.5px}
+.al .m{grid-column:2/4;font-size:12px;color:var(--muted)}
+.al .btn{height:30px;padding:0 10px;font-size:12px}
+.al.acked{background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.al.acked .dot{background:var(--amber);box-shadow:0 0 0 4px var(--amber-bg)}
+.alist .none{display:grid;place-items:center;text-align:center;gap:6px;padding:32px 12px;color:var(--muted);font-size:13px}
+.alist .none b{color:var(--green);font-size:15px}
+
+/* reports */
+.rpanel{grid-template-rows:auto auto auto minmax(0,1fr)}
+.rhead{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ptitle,.pfoot{display:none}
+.rtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.rtile{background:var(--soft);border-radius:12px;padding:10px 12px}
+.rtile .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.rtile .s{font-size:12px;color:var(--muted)}
+.rtile.wide{grid-column:span 2}
+.rtile .lst{font-size:12px;font-weight:600;line-height:1.5;color:var(--ink2)}
+.fields4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+@media (max-width:1400px){.kpi .v{font-size:24px}.dgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(280px,.8fr)}}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.dgrid{grid-template-columns:1fr;grid-template-rows:none}.dgrid .cpanel,.dgrid .apanel{grid-column:auto;grid-row:auto}.chart{height:220px}.dgrid .panel{max-height:60vh}}
+
+/* print: the report on its own, ready to save as a PDF */
+@media print{
+  @page{size:letter landscape;margin:12mm}
+  body{display:block;background:#fff;padding:0;overflow:visible;height:auto;font-size:11px}
+  .top,.foot,.fbar,.toasts,.drawer,.rhead,.tip,.view:not(#v-rep){display:none!important}
+  main,#v-rep,.rpanel{display:block!important;overflow:visible;height:auto}
+  .rpanel{padding:0;border-radius:0}
+  .ptitle{display:block;margin-bottom:12px;border-bottom:2px solid var(--ink);padding-bottom:8px}
+  .ptitle h2{margin:0;font-size:20px} .ptitle .sub{font-size:11px;color:#444}
+  .rtiles{margin-bottom:12px;grid-template-columns:repeat(6,1fr)}
+  .rtile{border:1px solid var(--line);background:#fff}
+  .tablewrap{overflow:visible}
+  .tbl{font-size:10px} .tbl th{position:static} .tbl td{padding:4px 6px} .tbl tr{break-inside:avoid}
+  .pfoot{display:block;margin-top:12px;font-size:10px;color:#666}
+}

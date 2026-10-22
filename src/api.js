@@ -10,7 +10,7 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clip = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
 const bad = (status, message) => Object.assign(new Error(message), { status });
 
-function create(agents, updates) {
+function create(agents, updates, reports) {
   const routes = [];
   const on = (method, pattern, fn) => routes.push({ method, re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[0-9a-f-]{36})') + '$'), fn });
 
@@ -58,7 +58,7 @@ function create(agents, updates) {
     const r = await db.tx(A, async c => {
       const h = (await c.query('select id, name from br.hospitals where id = $1', [p.id])).rows[0];
       if (!h) throw bad(404, 'Unknown hospital.');
-      const devices = (await c.query(`select d.id, d.identity, d.kind, d.name, d.model, d.android, d.room, d.unit, d.closet, d.location_locked locked, d.locked_at,
+      const devices = (await c.query(`select d.id, d.identity, d.kind, d.name, d.model, d.android, d.room, d.unit, d.closet, d.floor floor_set, br.floor_of(d.room, d.floor) floor, d.location_locked locked, d.locked_at,
           lu.name locked_by_name, coalesce(s.state, 'unknown') state, s.headline, s.last_beat, s.updated_at state_at,
           (select json_agg(json_build_object('agent', r.agent_id, 'pc', a.name, 'online', r.online, 'primary', r.is_primary, 'host', r.host) order by r.is_primary desc)
              from br.device_reach r join br.agents a on a.id = r.agent_id where r.device_id = d.id) reach
@@ -74,7 +74,7 @@ function create(agents, updates) {
 
   /* ---------- placement and the HCI lock ---------- */
   on('PATCH', '/api/devices/:id', async (A, b, p) => {
-    const set = {}; for (const f of ['room', 'unit', 'closet']) if (b[f] !== undefined) set[f] = clip(b[f], f === 'room' ? 20 : 40);
+    const set = {}; for (const f of ['room', 'unit', 'closet', 'floor']) if (b[f] !== undefined) set[f] = clip(b[f], f === 'room' || f === 'floor' ? 20 : 40);
     const keys = Object.keys(set); if (!keys.length) throw bad(400, 'Nothing to change.');
     await db.tx(A, async c => {
       const d = (await c.query('select * from br.devices where id = $1 for update', [p.id])).rows[0];
@@ -180,10 +180,15 @@ function create(agents, updates) {
   on('POST', '/api/agents/:id/approve', async (A, b, p) => updates.approve(A, { agentId: p.id }));
   on('POST', '/api/hospitals/:id/approve', async (A, b, p) => updates.approve(A, { hospitalId: p.id }));
 
+  /* ---------- dashboard and reports ---------- */
+  on('GET', '/api/dashboard', async (A, b, p, q) => reports.dashboard(A, q));
+  for (const k of ['uptime', 'alerts', 'inventory', 'activity']) on('GET', '/api/reports/' + k, async (A, b, p, q) => reports.report(A, k, q));
+  on('POST', '/api/alerts/:id/ack', async (A, b, p) => reports.ack(A, p.id));
+
   /* ---------- audit log ---------- */
   on('GET', '/api/hospitals/:id/audit', async (A, b, p, q) => {
     const lim = Math.min(500, Math.max(1, Number(q.get('limit')) || 200));
-    const r = await db.tx(A, c => c.query(`select l.id, l.at, l.action, l.details, l.origin, l.result, l.actor_kind, u.name user_name, u.email user_email, a.name pc, d.room, d.kind
+    const r = await db.tx(A, c => c.query(`select l.id, l.at, l.action, l.details, l.origin, l.result, l.actor_kind, coalesce(u.name, case when br.hci_user(l.actor_user) then 'HCI ONE support' end) user_name, u.email user_email, a.name pc, d.room, d.kind
       from br.audit_log l left join br.users u on u.id = l.actor_user left join br.agents a on a.id = l.actor_agent left join br.devices d on d.id = l.device_id
       where l.hospital_id = $1 order by l.id desc limit $2`, [p.id, lim]));
     return { ok: true, entries: r.rows };

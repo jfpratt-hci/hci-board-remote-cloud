@@ -12,7 +12,7 @@ global.T = T;
   const psql = s => execSync(process.env.PGHOST ? 'psql -q -v ON_ERROR_STOP=1 ' + s : 'su postgres -c ' + JSON.stringify('psql -q -v ON_ERROR_STOP=1 ' + s), { stdio: 'pipe' });
   const db = require('../src/db');
   const only = process.argv[2];
-  for (const name of ['db', 'auth', 'agent', 'stress', 'api', 'aztoken', 'updates']) {
+  for (const name of ['db', 'auth', 'agent', 'stress', 'api', 'aztoken', 'updates', 'reports']) {
     if (only && only !== name) continue;
     let f; try { f = require('./' + name + '.test.js'); } catch (e) { if (e.code === 'MODULE_NOT_FOUND') continue; throw e; }
     // each file gets a fresh database, built the same way production is: bootstrap, then migrations

@@ -16,7 +16,9 @@
     <div><div class="kicker">HCI ONE</div><h1>Board Remote</h1></div>
   </div>
   <nav class="nav" id="nav">
+    <a href="#dash" data-v="dash"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
     <a href="#boards" data-v="boards"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/></svg>Boards</a>
+    <a href="#rep" data-v="rep"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 17v-3M12 17v-6M15 17v-4"/></svg>Reports</a>
     <a href="#pcs" data-v="pcs"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>PCs</a>
     <a href="#people" data-v="people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6.5 6.5 0 0 1 3 6"/></svg>People</a>
     <a href="#log" data-v="log"><svg viewBox="0 0 24 24"><path d="M9 4h10v16H5V8z"/><path d="M9 4v4H5M9 12h6M9 16h6"/></svg>Audit log</a>
@@ -28,6 +30,35 @@
 </header>
 
 <main id="main">
+  <!-- dashboard -->
+  <section class="view" id="v-dash" hidden>
+    <div class="fbar" data-fbar></div>
+    <div class="dash">
+      <div class="kpis" id="kpis"></div>
+      <div class="dgrid">
+        <div class="panel cpanel"><div class="phead"><div><h2>Downtime by day</h2><p class="sub" id="chartSub">Hours boards spent offline each day</p></div></div><div class="chart" id="chart"></div></div>
+        <div class="panel"><div class="phead"><div><h2 id="gTitle">By unit</h2><p class="sub">Worst uptime first. Click one to filter to it.</p></div></div><div class="tablewrap"><table class="tbl" id="tGroups"></table></div></div>
+        <div class="panel"><div class="phead"><div><h2>Most downtime</h2><p class="sub">Click a board to open it.</p></div></div><div class="tablewrap"><table class="tbl" id="tWorst"></table></div></div>
+        <div class="panel apanel"><div class="phead"><div><h2>Open alerts</h2><p class="sub">Offline boards and PCs. Each closes on its own when the board or PC is back.</p></div></div><div class="alist" id="alist"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- reports -->
+  <section class="view" id="v-rep" hidden>
+    <div class="fbar" data-fbar></div>
+    <div class="panel rpanel" id="rPanel">
+      <div class="rhead">
+        <div class="seg" id="rSeg"><button data-r="uptime">Uptime</button><button data-r="alerts">Alerts and response</button><button data-r="inventory">Inventory</button><button data-r="activity">Support activity</button></div>
+        <div class="drow"><button class="btn" id="rCsv"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Download CSV</span></button><button class="btn dark" id="rPdf"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/></svg><span>Print or save PDF</span></button></div>
+      </div>
+      <div class="ptitle" id="rTitle"></div>
+      <div class="rtiles" id="rTiles"></div>
+      <div class="tablewrap"><table class="tbl" id="tRep"></table></div>
+      <div class="pfoot">HCI ONE Board Remote · 513 271 8100 · hci-tv.com</div>
+    </div>
+  </section>
+
   <!-- boards -->
   <section class="view" id="v-boards">
     <div class="bar">
@@ -145,8 +176,9 @@
   <div class="noscreen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M3 4l18 12"/></svg><span>The screen stays on the hospital's Board Remote PC. It can show patient details, so it is never stored here.</span></div>
   <div class="dsec">
     <div class="label">Location <span id="dLockTxt"></span></div>
-    <div class="fields3">
+    <div class="fields4">
       <div class="field"><label for="dRoom">Room</label><input id="dRoom" type="text" maxlength="20"></div>
+      <div class="field"><label for="dFloor">Floor</label><input id="dFloor" type="text" maxlength="20"></div>
       <div class="field"><label for="dUnit">Unit</label><input id="dUnit" type="text" maxlength="40"></div>
       <div class="field"><label for="dCloset">Closet</label><input id="dCloset" type="text" maxlength="40"></div>
     </div>
@@ -168,6 +200,7 @@
 </aside>
 
 <div class="toasts" id="toasts"></div>
+<div class="tip" id="tip" hidden></div>
 <script src="/app.js"></script>
 </body>
 </html>
