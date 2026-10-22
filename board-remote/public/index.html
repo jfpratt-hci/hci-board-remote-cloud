@@ -106,7 +106,7 @@ main{min-height:0;overflow:auto}
 .bad .pill{background:var(--red-bg);color:var(--red)}
 .info .pill{background:var(--blue-bg);color:var(--blue)}
 
-.screen{position:relative;aspect-ratio:16/9;border-radius:12px;background:var(--screen);overflow:hidden;cursor:pointer;display:grid;place-items:center}
+.screen{position:relative;aspect-ratio:var(--slot,16/9);border-radius:12px;background:var(--screen);overflow:hidden;cursor:pointer;display:grid;place-items:center}
 .screen img{min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;display:block;opacity:0;transition:opacity .2s}
 .card.has-shot .screen img{opacity:1}
 .veil{position:absolute;inset:0;display:grid;place-content:center;gap:6px;text-align:center;padding:16px;color:#fff;background:rgba(23,22,15,.82)}
@@ -455,7 +455,7 @@ function makeCard(b) {
     '<span class="zoom">' + IC.expand + 'Open</span><div class="drop">Drop APK to install</div></div>' +
     '<div class="meta"><button class="addr" title="Copy the adb shell command"></button><span class="app"></span></div>' +
     '<div class="row"><button class="btn connect"></button><button class="btn mirror" title="Live mirror">' + IC.monitor + '<span>Mirror</span></button><button class="btn shell" title="Shell window">' + IC.term + '<span>Shell</span></button></div>';
-  const c = { id: b.id, el, img: el.querySelector('img'), dead: false, url: null };
+  const c = { id: b.id, el, img: el.querySelector('img'), dead: false, url: null, ar: store.get('br.ar.' + b.id, 0) || (b.size && b.size.w && b.size.h ? b.size.w / b.size.h : 0) };
   el.querySelector('.screen').onclick = e => { if (e.target.closest('.badge')) { key(c.id, 'wake'); return; } openFocus(c.id); };
   el.querySelector('.badge').title = 'Click to wake the screen';
   el.querySelector('.more').onclick = e => { e.stopPropagation(); openMenu(c.id, e.currentTarget); };
@@ -623,13 +623,19 @@ function layout() {
   const scr = first.querySelector('.screen');
   if (first.offsetHeight && scr.offsetHeight) fixedH = first.offsetHeight - scr.offsetHeight;
   const W = main.clientWidth, H = main.clientHeight, g = 16, pad = 24, maxW = 760, minW = 220;
+  // the screen box follows the boards: portrait boards get tall boxes, landscape wide ones; a mix uses the most common
+  const ars = on.map(c => c.ar || 16 / 9), tall = ars.filter(a => a < 1);
+  const pick = tall.length > ars.length / 2 ? tall : ars.filter(a => a >= 1);
+  pick.sort((a, b) => a - b);
+  const slot = pick[Math.floor(pick.length / 2)] || 16 / 9;
+  grid.style.setProperty('--slot', String(slot));
   let best = { c: 1, w: 0 };
   for (let c = 1; c <= n; c++) {
     const colW = (W - g * (c - 1)) / c;
     if (colW < minW && c > 1) break;
     const rows = Math.ceil(n / c);
     const rowH = (H - g * (rows - 1)) / rows;
-    const wByH = (rowH - fixedH) * 16 / 9 + pad;
+    const wByH = (rowH - fixedH) * slot + pad;
     const w = Math.min(colW, wByH, maxW);
     if (w > best.w) best = { c, w };
   }
@@ -684,6 +690,14 @@ async function loadFrame(id, fresh) {
   try { await im.decode(); } catch (e) { URL.revokeObjectURL(url); throw e; }
   return { url, w: im.naturalWidth, h: im.naturalHeight };
 }
+/* Boards can be portrait or landscape, and can turn. Each card remembers its shape so the wall lays out right. */
+function setShape(c, w, h) {
+  if (!w || !h) return;
+  const ar = Math.round(w / h * 1000) / 1000;
+  if (Math.abs(ar - (c.ar || 0)) < 0.01) return;
+  c.ar = ar; store.set('br.ar.' + c.id, ar);
+  layout();
+}
 function setThumb(c, url) {
   if (c.url) URL.revokeObjectURL(c.url);
   c.url = url; c.img.src = url;
@@ -700,9 +714,11 @@ async function loadThumb(id, width) {
     const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height;
     cv.getContext('2d').drawImage(bmp, 0, 0); bmp.close();
     const small = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.86));
-    if (small) return URL.createObjectURL(small);
+    if (small) return { url: URL.createObjectURL(small), w: cv.width, h: cv.height };
   } catch (e) { /* older browser: use the full picture */ }
-  return URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob), im = new Image(); im.src = url;
+  try { await im.decode(); } catch (e) { /* shape stays as it was */ }
+  return { url, w: im.naturalWidth, h: im.naturalHeight };
 }
 /* Screens on the wall. Only cards in view refresh, and the page shares one budget, so 150 boards cost the boards and
    the network no more than 20 do. Normal: each card at least every 4 s, at most 3 captures a second for the page.
@@ -734,7 +750,10 @@ function wallTick() {
 }
 async function pullThumb(c) {
   c.loading = true; c.shotAt = Date.now(); wallBusy++;
-  try { const url = await loadThumb(c.id, c.img.parentNode.clientWidth || 360); if (!c.dead && WALL[screensMode]) setThumb(c, url); else URL.revokeObjectURL(url); }
+  try {
+    const t = await loadThumb(c.id, c.img.parentNode.clientWidth || 360);
+    if (!c.dead && WALL[screensMode]) { setShape(c, t.w, t.h); setThumb(c, t.url); } else URL.revokeObjectURL(t.url);
+  }
   catch (e) { /* board busy or just dropped */ }
   finally { c.loading = false; wallBusy--; }
 }
@@ -1121,6 +1140,7 @@ async function focusLoop(id, token) {
     const start = performance.now();
     try {
       const f = await loadFrame(id, true);
+      { const c = cards.get(id); if (c) setShape(c, f.w, f.h); }
       if (focusId !== id || focusToken !== token) { URL.revokeObjectURL(f.url); break; }
       if (furl) URL.revokeObjectURL(furl);
       furl = f.url; fimg.src = f.url; natural = { w: f.w, h: f.h };
