@@ -21,6 +21,11 @@
   }
   try { if (localStorage.getItem(KEY)) mark(true); } catch (e) { /* storage blocked */ }
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  // the version, next to HCI ONE in the header of every page, so support can ask "which version are you on"
+  fetch('/api/ping', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+    if (!j || !j.version) return;
+    document.querySelectorAll('.brand .kicker').forEach(function (k) { k.textContent = 'HCI ONE \u00B7 ' + j.version; k.title = 'Board Remote ' + j.version; });
+  }).catch(function () { /* Board Remote not running */ });
   var box = document.createElement('div'); box.className = 'hrb'; box.setAttribute('role', 'status');
   document.body.appendChild(box);
   var EYE = '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
