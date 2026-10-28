@@ -49,7 +49,7 @@ async function boot() {
   const saved = (() => { try { return localStorage.getItem('br.h'); } catch (e) { return null; } })();
   H = (hs.find(h => h.id === saved) || hs[0] || {}).id || null;
   $('#hosp').innerHTML = hs.map(h => '<option value="' + esc(h.id) + '">' + esc(h.name) + '</option>').join('');
-  $('#hosp').hidden = hs.length < 2; if (H) $('#hosp').value = H;
+  $('#hosp').hidden = hs.length < 2; $('#hosp').parentElement.hidden = hs.length < 2; if (H) $('#hosp').value = H;
   if (!H && !isHci()) {
     $('#units').innerHTML = '<div class="empty"><h2>No hospital yet</h2><p class="sub">You are signed in, but nobody has added you to a hospital. Ask your hospital\'s IT lead or HCI at 513 271 8100.</p></div>';
   }
@@ -65,7 +65,7 @@ function hospitalChanged() {
 }
 function route() {
   const v = (location.hash || '#dash').slice(1);
-  view = ['dash', 'rep', 'boards', 'pcs', 'people', 'log', 'hci', 'upd'].indexOf(v) >= 0 && ((v !== 'hci' && v !== 'upd') || isHci()) ? v : 'dash';
+  view = ['dash', 'rep', 'ctr', 'boards', 'pcs', 'people', 'log', 'hci', 'upd'].indexOf(v) >= 0 && ((v !== 'hci' && v !== 'upd') || isHci()) ? v : 'dash';
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === view));
   document.querySelectorAll('.view').forEach(s => { s.hidden = s.id !== 'v-' + view; });
   if (view !== 'boards') closeDrawer();
@@ -77,6 +77,7 @@ function load() {
   if (view === 'dash') return loadDash();
   if (view === 'rep') return loadRep();
   if (!H) return;
+  if (view === 'ctr') return loadCtr();
   if (view === 'boards' || view === 'pcs') return loadFleet();
   if (view === 'people') return loadPeople();
   if (view === 'log') return loadLog();
@@ -90,7 +91,7 @@ function listen() {
   es = new EventSource('/api/hospitals/' + H + '/events');
   es.onopen = () => $('#live').classList.add('on');
   es.onerror = () => $('#live').classList.remove('on');
-  es.addEventListener('fleet', () => { clearTimeout(refetch); refetch = setTimeout(() => { if (view === 'boards' || view === 'pcs') loadFleet(); if (view === 'log') loadLog(); if (view === 'dash') loadDash(true); }, 250); });
+  es.addEventListener('fleet', () => { clearTimeout(refetch); refetch = setTimeout(() => { if (view === 'boards' || view === 'pcs') loadFleet(); if (view === 'log') loadLog(); if (view === 'dash') loadDash(true); if (view === 'ctr') loadCtr(true); }, 250); });
   es.addEventListener('command', e => { let d = {}; try { d = JSON.parse(e.data); } catch (x) { /* ignore */ } if (pendingCmd.has(d.id)) settle(d.id); });
 }
 
@@ -478,7 +479,7 @@ function renderDash() {
     '<tr class="click" data-b="' + esc(b.id) + '"><td><b>' + esc(boardName(b)) + '</b>' + (b.state === 'offline' ? ' <span class="tag bad">Offline</span>' : '') + '</td><td class="m">' + esc([DASH.by === 'hospital' ? b.hname : '', b.unit, b.floor ? 'floor ' + b.floor : ''].filter(Boolean).join(', ')) + '</td><td class="n">' + hm(b.down_s) + (b.outages > 1 ? '<div class="sub">' + b.outages + ' times</div>' : '') + '</td><td class="n">' + pctTxt(b.uptime) + '</td></tr>').join('') : '<tr><td colspan="4" class="m">No board went offline ' + (F.range === 'today' ? 'today' : 'in this range') + '.</td></tr>');
   $('#alist').innerHTML = DASH.alerts.length ? DASH.alerts.map(a =>
     '<div class="al ' + (a.acked_at ? 'acked' : 'bad') + '"><span class="dot"></span><span class="t">' + esc(a.title) + '</span>' + (a.acked_at ? '<span class="tag warn">' + esc((a.acked_by_name || a.acked_by_email || 'Someone').split(' ')[0]) + ' has it</span>' : '<button class="btn dark" data-ack="' + esc(a.id) + '">Acknowledge</button>') +
-    '<span class="m">' + esc([a.kind === 'pc_offline' ? 'Board Remote PC' : KIND[a.board_kind] || 'Board', (DASH.by === 'hospital' ? a.hname : ''), a.unit, 'since ' + ago(a.opened_at).replace(' ago', '') + ' ago'].filter(Boolean).join(' · ')) + (a.acked_at ? ' · acknowledged ' + esc(ago(a.acked_at)) : '') + '</span></div>').join('')
+    '<span class="m">' + esc([a.kind === 'pc_offline' ? 'Board Remote PC' : /^container/.test(a.kind) ? 'Backend container' : a.kind === 'service' || a.kind === 'prometheus_down' ? 'Backend service' : KIND[a.board_kind] || 'Board', (DASH.by === 'hospital' ? a.hname : ''), a.unit, 'since ' + ago(a.opened_at).replace(' ago', '') + ' ago'].filter(Boolean).join(' · ')) + (a.acked_at ? ' · acknowledged ' + esc(ago(a.acked_at)) : '') + '</span></div>').join('')
     : '<div class="none"><b>Nothing open</b>Every board and PC that matches is answering.</div>';
 }
 function drawChart() {
@@ -591,10 +592,647 @@ $('#rCsv').addEventListener('click', () => {
 });
 $('#rPdf').addEventListener('click', () => { if (REP) window.print(); });
 
+/* ---------------- containers (cAdvisor) ---------------- */
+// Seven fixed colours, given to the busiest containers when a host is picked and kept while the page
+// shows it, so a container never changes colour between charts or refreshes. The rest fold into Other.
+const PAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'], OTHER = '#a8a39b';
+const K = { host: '', range: '1h', q: '', focus: '', metric: 'cpu', from: 0, to: 0, prev: '1h' };   // custom: from/to in ms, to 0 = up to now
+try { const k = JSON.parse(localStorage.getItem('br.k') || '{}'); if (k.range) K.range = k.range; if (k.range === 'custom') { K.from = k.from || 0; K.to = k.to || 0; K.prev = k.prev || '1h'; if (K.from < Date.now() - 8 * 86400000) K.range = K.prev; } if (k.host) K.host = k.host; if (k.metric) K.metric = k.metric; } catch (e) { /* private window */ }
+const saveK = () => { try { localStorage.setItem('br.k', JSON.stringify({ host: K.host, range: K.range, metric: K.metric, from: K.from, to: K.to, prev: K.prev })); } catch (e) { /* private window */ } };
+let CTR = null, ctrSeq = 0, kColors = null, kColorKey = '';
+const bytes = n => { if (n === null || n === undefined) return '–'; const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (n >= 100 || i === 0 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i]; };
+const rate = n => n === null || n === undefined ? '–' : bytes(n) + '/s';
+const cpuTxt = c => c === null || c === undefined ? '–' : (c * 100 < 10 ? (c * 100).toFixed(1) : Math.round(c * 100)) + '%';
+// key, title, subtitle, format, the smallest top of the scale (so an idle chart still reads sensibly)
+const KM = [['cpu', 'CPU', '100% is one full core', cpuTxt, 0.05], ['mem', 'Memory', 'Working set', bytes, 1048576], ['rx', 'Network received', 'Bytes per second in', rate, 1024],
+  ['tx', 'Network sent', 'Bytes per second out', rate, 1024], ['rd', 'Disk read', 'Bytes per second', rate, 1024], ['wr', 'Disk written', 'Bytes per second', rate, 1024],
+  ['throttle', 'CPU throttled', 'Share of time its CPU limit held it back', v => v === null || v === undefined ? '–' : Math.round(v * 100) + '%', 0.1, 'max']];
+const upFor = t => { if (!t) return ''; const s = (Date.now() - new Date(t)) / 1000; return s < 3600 ? Math.max(1, Math.round(s / 60)) + ' min' : s < 172800 ? Math.round(s / 3600) + ' h' : Math.round(s / 86400) + ' days'; };
+
+// the time, service, host and search controls: inside the analytics console, or above the page when there is none
+function kDock(inside) {
+  const bar = $('.ctrbar'), home = inside && $('#kConCtl');
+  if (home) { if (bar.parentNode !== home) home.appendChild(bar); }
+  else if (bar.parentNode !== $('#v-ctr')) $('#v-ctr').insertBefore(bar, $('#kBody'));
+}
+// the time asked for, as query parameters: a preset, or from (and to, unless it runs up to now)
+const kWindowQ = () => K.range !== 'custom' ? { range: K.range } : Object.assign({ from: new Date(K.from).toISOString() }, K.to ? { to: new Date(K.to).toISOString() } : {});
+async function loadCtr(quiet) {
+  if (!H) return;
+  const q = Object.assign({ hospital: H, host: K.host }, kWindowQ());
+  const n = ++ctrSeq, r = await api('GET', '/api/containers?' + new URLSearchParams(q));
+  if (n !== ctrSeq || view !== 'ctr') return;
+  if (!r.ok) {
+    if (!quiet) toast(r.message, true);
+    if (K.range === 'custom' && /^Pick /.test(r.message || '')) { K.range = K.prev; saveK(); }   // a stretch no longer kept
+    return;
+  }
+  CTR = r;
+  if (r.host && K.host !== r.host.id) { K.host = r.host.id; saveK(); }
+  renderCtr();
+  // a refresh brings in new events too, unless more pages were opened (they would jump)
+  if (quiet && CTR.host && KE.rows.length <= 25 && kEvKey() === KE.want) loadEv(false);
+}
+const kMatch = c => !K.q || (c.name + ' ' + c.image).toLowerCase().indexOf(K.q.toLowerCase()) >= 0;
+function kPickColors() {
+  // the busiest by CPU and memory together, over the range shown
+  const key = CTR.host.id + '|' + K.range + (K.range === 'custom' ? '|' + K.from + '|' + K.to : '');
+  if (kColors && kColorKey === key) return;
+  const avg = a => { const v = (a || []).filter(x => x !== null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+  const names = CTR.containers.filter(c => c.running).map(c => c.name);
+  const cpu = new Map(names.map(n => [n, avg(CTR.series.cpu[n])])), mem = new Map(names.map(n => [n, avg(CTR.series.mem[n])]));
+  const rank = m => { const o = names.slice().sort((a, b) => m.get(b) - m.get(a)); return new Map(o.map((n, i) => [n, i])); };
+  const rc = rank(cpu), rm = rank(mem);
+  kColors = new Map(names.sort((a, b) => (rc.get(a) + rm.get(a)) - (rc.get(b) + rm.get(b)) || a.localeCompare(b)).slice(0, PAL.length).map((n, i) => [n, PAL[i]]));
+  kColorKey = key;
+}
+// a running container's state: fine, or what is pressing on it now
+function kFlags(c) {
+  const f = [], open = new Set((CTR.alerts || []).filter(a => a.container === c.name).map(a => a.kind));
+  if (open.has('container_memory') || (c.mem_limit && c.mem / c.mem_limit >= 0.9)) f.push('<span class="tag bad">Memory limit</span>');
+  if (open.has('container_cpu') || c.throttle >= 0.25) f.push('<span class="tag warn">CPU throttled ' + Math.round((c.throttle || 0) * 100) + '%</span>');
+  if (open.has('container_restarting')) f.push('<span class="tag bad">Restarting</span>');
+  if (open.has('container_unusual')) f.push('<span class="tag warn">Unusual</span>');
+  if (c.psi_mem >= 10 || c.psi_io >= 25) f.push('<span class="tag warn" title="Share of the last minute it waited for ' + (c.psi_mem >= 10 ? 'memory' : 'disk') + '">Waiting on ' + (c.psi_mem >= 10 ? 'memory ' + Math.round(c.psi_mem) : 'disk ' + Math.round(c.psi_io)) + '%</span>');
+  return f.length ? f.join(' ') : '<span class="tag ok">Running</span>';
+}
+const KEV_C = { restart: 'var(--red)', stopped: 'var(--red)', started: 'var(--green)', limit: 'var(--amber)' };
+const EVW = { restart: ['bad', 'Restarted'], stopped: ['bad', 'Stopped'], started: ['ok', 'Started'], limit: ['warn', 'Memory limit'] };
+const kLast = a => { for (let i = (a || []).length - 1; i >= 0; i--) if (a[i] !== null) return a[i]; return null; };
+function renderCtr() {
+  const r = CTR;
+  $('#kHost').innerHTML = r.hosts.map(h => '<option value="' + esc(h.id) + '">' + esc(h.name) + (!h.ok || h.stale ? ' (not reporting)' : '') + '</option>').join('');
+  $('#kHost').hidden = r.hosts.length < 2; if (r.host) $('#kHost').value = r.host.id;
+  document.querySelectorAll('#kRange button').forEach(b => b.classList.toggle('on', b.dataset.k === K.range));
+  $('#kCust').textContent = K.range === 'custom' && CTR.from ? kSpan(CTR.from, K.to ? CTR.to : 0) : 'Custom';
+  $('#kBack').hidden = K.range !== 'custom'; $('#kBack').textContent = '✕ Back to ' + ($('#kRange [data-k="' + K.prev + '"]') || { textContent: '1 h' }).textContent;
+  // pick one container from anywhere on the page, without scrolling to the table
+  $('#kOne').innerHTML = '<option value="">Every container (' + r.containers.length + ')</option>' + r.containers.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + (c.running ? '' : ' (stopped)') + '</option>').join('');
+  $('#kOne').hidden = !r.host; $('#kOne').value = K.focus;
+  if (!r.host) {
+    $('#kSeen').textContent = '';
+    kDock(false);
+    $('#kBody').innerHTML = '<div class="empty"><h2>No Docker hosts yet</h2><p class="sub">The containers of this hospital\'s backend (MediaCare and its services) show here once a Board Remote PC at the hospital reads cAdvisor on the Docker host.</p>' +
+      '<p class="sub"><b>1.</b> On the Docker host, add cAdvisor if it is not there: <code>deploy/monitoring/add-cadvisor.ps1</code> (Windows) or <code>add-cadvisor.sh</code> (Linux). It listens on port 8098.<br><b>2.</b> For service alerts, add Prometheus too: <code>add-prometheus.ps1</code> or <code>add-prometheus.sh</code>, port 9090.<br><b>3.</b> On a Board Remote PC joined to this hospital, open Remote, Backend containers, and add <code>http://&lt;host&gt;:8098</code> and <code>http://&lt;host&gt;:9090</code>.<br><b>4.</b> Containers show here within a minute.</p></div>';
+    return;
+  }
+  if (!$('#kIns')) {
+    $('#kBody').innerHTML = '<section class="kcon" id="kOneP" aria-label="Container analytics">' +
+      '<div class="kc-head"><div class="kc-title"><span class="kc-live" title="Live: a new minute from cAdvisor every 60 s"></span><div><h2>Container analytics</h2><p id="kOneS"></p></div></div><div class="kc-stats" id="kConStats"></div></div>' +
+      '<div class="kc-ctl" id="kConCtl"></div>' +
+      '<div class="kc-tiles" id="kTiles"></div>' +
+      '<div class="kc-main"><div class="kc-card"><div class="kc-ch"><div><span class="kc-k">Viewing</span><h3 id="kOneT"></h3></div><span id="kOneX"></span></div><div id="kOneC"></div></div>' +
+      '<div class="kc-card" id="kChgP"><div class="kc-ch"><div><span class="kc-k">What changed lately</span><p id="kChgS"></p></div></div><div class="kchg" id="kChg"></div></div></div>' +
+      '<div class="kc-card" id="kHeatP"><div class="kc-ch"><div><span class="kc-k">Every container over time</span><p id="kHeatS"></p></div></div><div class="kheat" id="kHeat"></div><div id="kHeatM"></div></div></section>' +
+      '<div class="kdash">' +
+      '<div class="panel w5" id="kInsP"><div class="phead"><div><h2>What is going on</h2><p class="sub" id="kInsS"></p></div><span class="kstate" id="kInsT"></span></div><div class="kins" id="kIns"></div></div>' +
+      '<div class="panel w7" id="kSplitP"><div class="phead"><div><h2>Where the host goes</h2><p class="sub">Right now, split by container. The empty end is what is left. Click a part to look at that container.</p></div></div><div class="ksplit" id="kSplit"></div></div>' +
+      '<div class="panel w7" id="kAlertsP"><div class="phead"><div><h2>Problems on this host</h2><p class="sub" id="kAlertsSub"></p></div></div><div id="kAlertsC"></div><div class="alist" id="kAlerts"></div><div id="kAlertsM"></div></div>' +
+      '<div class="panel w7" id="kSizeP"><div class="phead"><div><h2>Sizing and headroom</h2><p class="sub" id="kSizeS"></p></div></div><div class="kfcs" id="kSizeF"></div><div class="tablewrap"><table class="tbl" id="tSize"></table></div>' +
+      '<div class="kfoot"><p class="sub">Suggestions leave 30% over the peak. For a Java service keep the limit at least a quarter above its -Xmx, or it is stopped when the heap fills.</p><span id="kSizeM"></span></div><div id="kSizeP2"></div></div>' +
+      '<div class="panel w5"><div class="phead"><div><h2>Recent events</h2><p class="sub" id="kEvS"></p></div></div><div id="kEvC"></div><div class="tablewrap"><table class="tbl kevt" id="tEv"></table></div><div id="kEvM"></div></div>' +
+      '<div class="panel w12"><div class="phead"><div><h2>Containers</h2><p class="sub">Click one to look at it, again to see the whole host. Click a column to sort by it.</p></div></div><div id="kCtrC"></div><div class="tablewrap"><table class="tbl" id="tCtr"></table></div><div id="kCtrM"></div></div></div>';
+    kDock(true);
+  }
+  kPickColors();
+  const h = r.host, last = kLast;
+  $('#kSeen').textContent = (h.ok && !h.stale ? 'Read ' : 'Last read ') + ago(h.ok ? h.last_ok : h.last_seen) + (h.pc ? ' by ' + h.pc : '') + (h.cadvisor ? ' · cAdvisor ' + h.cadvisor : '') + (h.address ? ' · ' + h.address.replace(/^https?:\/\//, '') : '') +
+    (h.prometheus ? ' · Prometheus ' + (h.prom_ok ? h.prom_rules + ' rules checked' : 'not answering') : ' · no Prometheus: service alerts off');
+  // the console's header: the host at a glance
+  const S = r.series, hc = last(S.cpu['']), hm2 = last(S.mem['']);
+  const rn = (CTR.marks || []).filter(m => m.kind === 'restart').reduce((a, m) => a + m.n, 0), open = (CTR.alerts || []).length;
+  const pill = (cls, html, title) => '<span class="kc-pill ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + html + '</span>';
+  $('#kConStats').innerHTML =
+    pill(!h.ok || h.stale ? 'bad' : h.stopped ? 'bad' : 'ok', '<b>' + h.running + '</b> running' + (h.stopped ? ' · <b>' + h.stopped + '</b> stopped' : ''), !h.ok || h.stale ? h.error || 'cAdvisor is not reporting' : '') +
+    pill('', 'CPU <b>' + (hc !== null && h.cores ? Math.round(hc / h.cores * 100) + '%' : '–') + '</b> of ' + (h.cores || '?') + ' cores') +
+    pill('', 'Memory <b>' + (hm2 !== null && h.memory ? Math.round(hm2 / h.memory * 100) + '%' : '–') + '</b> of ' + bytes(h.memory)) +
+    pill(rn ? 'warn' : '', '<b>' + rn + '</b> ' + (rn === 1 ? 'restart' : 'restarts')) +
+    pill(open ? 'bad' : 'ok', '<b>' + open + '</b> ' + (open === 1 ? 'problem' : 'problems') + ' open') +
+    '<span class="kc-pill" id="kConState"></span>';
+  renderInsights(); renderAlerts(); renderSplit(); renderConsole(); renderSizing(); renderTable();
+  if (kEvKey() !== KE.want) loadEv(false); else renderEv();
+}
+
+/* Lists on this page that can grow (problems, containers, the heatmap, sizing) show a page at a time,
+   with chips to narrow them; events are paged by the server. KP[list] is how many are shown now. */
+const KPAGE = { alerts: 6, ctr: 25, heat: 15, size: 15 }, KP = {}, KF = { alerts: '', ctr: '', ev: '' };
+const kShown = (list, total) => Math.min(total, KP[list] || KPAGE[list]);
+function kMore(list, total) {
+  const n = kShown(list, total); if (total <= KPAGE[list]) return '';
+  return '<div class="kmore"><span>Showing ' + n + ' of ' + total + '</span>' + (n < total
+    ? '<button class="btn" data-more="' + list + '">Show ' + Math.min(KPAGE[list], total - n) + ' more</button>' + (total - n > KPAGE[list] ? '<button class="btn" data-all="' + list + '">Show all</button>' : '')
+    : '<button class="btn" data-less="' + list + '">Show fewer</button>') + '</div>';
+}
+const kChips = (list, opts) => '<div class="kchips">' + opts.map(([v, label, n]) => '<button data-chip="' + list + '" data-v="' + v + '" class="' + (KF[list] === v ? 'on' : '') + '"' + (v && !n && KF[list] !== v ? ' disabled' : '') + '>' + label + ' <b>' + n + '</b></button>').join('') + '</div>';
+const KRENDER = { alerts: () => renderAlerts(), ctr: () => renderTable(), heat: () => renderHeat(), size: () => renderSizing(), ev: () => loadEv(false) };
+
+// Problems on this host, grouped into chips by what kind of problem it is; the unacknowledged first
+const AL_G = { container_down: 'stop', container_restarting: 'stop', container_memory: 'mem', container_cpu: 'cpu', container_unusual: 'unusual', service: 'svc', prometheus_down: 'svc', container_host_down: 'host' };
+const AL_L = [['stop', 'Stopped and restarting'], ['mem', 'Memory'], ['cpu', 'CPU'], ['unusual', 'Unusual'], ['svc', 'Services'], ['host', 'cAdvisor']];
+function renderAlerts() {
+  const h = CTR.host, all = (CTR.alerts || []).slice().sort((a, b) => (a.acked_at ? 1 : 0) - (b.acked_at ? 1 : 0) || new Date(b.opened_at) - new Date(a.opened_at));
+  $('#kAlertsSub').textContent = all.length ? all.length + ' open' + (all.some(a => a.acked_at) ? ', ' + all.filter(a => !a.acked_at).length + ' not yet acknowledged' : '') + '. From cAdvisor' + (h.prometheus ? ' and the services\' own numbers in Prometheus' : '') + '. Each closes on its own once the cause is gone.' : '';
+  $('#kAlertsP').hidden = !all.length && h.ok;
+  const n = g => all.filter(a => (AL_G[a.kind] || 'svc') === g).length;
+  if (KF.alerts && !n(KF.alerts)) KF.alerts = '';
+  $('#kAlertsC').innerHTML = all.length > 3 ? kChips('alerts', [['', 'All', all.length]].concat(AL_L.filter(([g]) => n(g)).map(([g, l]) => [g, l, n(g)]))) : '';
+  const al = all.filter(a => !KF.alerts || (AL_G[a.kind] || 'svc') === KF.alerts);
+  $('#kAlerts').innerHTML = al.length ? al.slice(0, kShown('alerts', al.length)).map(a => '<div class="al ' + (a.acked_at ? 'acked' : 'bad') + '"><span class="dot"></span><span class="t">' + esc(a.title) + '</span>' +
+    (a.acked_at ? '<span class="tag warn">' + esc(String(a.acked_by_name || 'Someone').split(' ')[0]) + ' has it</span>' : '<button class="btn dark" data-kack="' + esc(a.id) + '">Acknowledge</button>') +
+    '<span class="m">' + esc((KIND_K[a.kind] || 'Backend') + ' · since ' + ago(a.opened_at).replace(' ago', '') + ' ago') + '</span></div>').join('') : '<div class="none"><b>Nothing wrong</b>Every container is running within its limits.</div>';
+  $('#kAlertsM').innerHTML = kMore('alerts', al.length);
+}
+
+// Containers: All, the ones needing a look, the stopped ones; sorted by any column
+const kTrouble = c => !c.running || (CTR.alerts || []).some(a => a.container === c.name) || (c.mem_limit && c.mem / c.mem_limit >= 0.9) || c.throttle >= 0.25 || c.psi_mem >= 10 || c.psi_io >= 25;
+const KSORT = { name: c => c.name, restarts: c => c.restarts || 0, cpu: c => c.running ? c.cpu || 0 : -1, mem: c => c.running ? c.mem || 0 : -1, rx: c => c.running ? c.rx || 0 : -1, tx: c => c.running ? c.tx || 0 : -1, fs: c => c.fs || 0, up: c => c.running && c.started_at ? -new Date(c.started_at) : -Infinity };
+function renderTable() {
+  const base = CTR.containers.filter(kMatch), trouble = base.filter(kTrouble).length, stopped = base.filter(c => !c.running).length;
+  $('#kCtrC').innerHTML = kChips('ctr', [['', 'All', base.length], ['trouble', 'Needs a look', trouble], ['stopped', 'Stopped', stopped]]);
+  let rows = base.filter(c => !KF.ctr || (KF.ctr === 'stopped' ? !c.running : kTrouble(c)));
+  if (K.sort) { const f = KSORT[K.sort], d = K.desc ? -1 : 1; rows = rows.slice().sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * d || a.name.localeCompare(b.name); }); }
+  const th = (k, label, n) => '<th class="sort' + (n ? ' n' : '') + (K.sort === k ? ' on' : '') + '" data-sort="' + k + '">' + label + (K.sort === k ? (K.desc ? ' ↓' : ' ↑') : '') + '</th>';
+  $('#tCtr').innerHTML = '<tr>' + th('name', 'Container') + '<th>Image</th><th>Status</th>' + th('restarts', 'Restarts', 1) + th('cpu', 'CPU', 1) + th('mem', 'Memory', 1) + th('rx', 'Net in', 1) + th('tx', 'Net out', 1) + th('fs', 'Disk', 1) + th('up', 'Up', 1) + '</tr>' +
+    (rows.length ? rows.slice(0, kShown('ctr', rows.length)).map(c =>
+    '<tr class="click' + (K.focus === c.name ? ' picked' : '') + '" data-c="' + esc(c.name) + '"><td><b><span class="sw" style="background:' + (kColors.get(c.name) || OTHER) + '"></span>' + esc(c.name) + '</b></td><td><div class="img" title="' + esc(c.image) + '">' + esc(c.image) + '</div></td>' +
+    '<td>' + (c.running ? kFlags(c) : '<span class="tag bad">Stopped</span><div class="sub">' + esc(ago(c.last_seen)) + '</div>') + '</td>' +
+    '<td class="n">' + (c.restarts ? c.restarts + '<div class="sub">last ' + esc(ago(c.restarted_at)) + '</div>' : '0') + '</td>' +
+    '<td class="n">' + (c.running ? cpuTxt(c.cpu) : '–') + '</td><td class="n">' + (c.running ? bytes(c.mem) + (c.mem_limit ? '<div class="sub">' + Math.round(c.mem / c.mem_limit * 100) + '% of ' + bytes(c.mem_limit) + '</div>' : '') : '–') + '</td>' +
+    '<td class="n">' + (c.running ? rate(c.rx) : '–') + '</td><td class="n">' + (c.running ? rate(c.tx) : '–') + '</td><td class="n">' + bytes(c.fs) + '</td><td class="n">' + (c.running ? upFor(c.started_at) : '–') + '</td></tr>').join('')
+    : '<tr><td colspan="10" class="m">' + (K.q ? 'No container matches.' : KF.ctr ? 'None right now.' : 'cAdvisor reported no containers.') + '</td></tr>');
+  $('#kCtrM').innerHTML = kMore('ctr', rows.length);
+}
+
+// Recent events, a page at a time from the server: repeats within 10 minutes are one row with a count
+const KE = { want: '', rows: [], next: null, counts: {} };
+const kEvQ = () => Object.assign({ hospital: H, host: CTR.host.id }, kWindowQ(), KF.ev ? { kind: KF.ev } : {}, K.focus ? { name: K.focus } : {});
+const kEvKey = () => CTR && CTR.host ? JSON.stringify(kEvQ()) : '';
+async function loadEv(more) {
+  if (!CTR || !CTR.host) return;
+  const q = kEvQ(), key = JSON.stringify(q);
+  if (more) { if (!KE.next) return; q.before = KE.next; }
+  KE.want = key;
+  const r = await api('GET', '/api/containers/events?' + new URLSearchParams(q));
+  if (KE.want !== key || view !== 'ctr') return;   // something else was asked for meanwhile
+  if (!r.ok) { toast(r.message, true); return; }
+  KE.rows = more ? KE.rows.concat(r.rows) : r.rows; KE.next = r.next; KE.counts = r.counts;
+  renderEv();
+}
+const kRangeWords = () => K.range === 'custom' && CTR.from ? 'from ' + kSpan(CTR.from, K.to ? CTR.to : 0) : ({ '1h': 'in the last hour', '6h': 'in the last 6 hours', '24h': 'in the last 24 hours', '7d': 'in the last 7 days' })[K.range] || '';
+function renderEv() {
+  if (!$('#tEv')) return;
+  const c = KE.counts || {}, tot = Object.values(c).reduce((a, b) => a + b, 0);
+  $('#kEvS').textContent = (K.focus ? K.focus + ': restarts' : 'Restarts') + ', stops, starts and memory limit hits ' + kRangeWords() + '. The same again within 10 minutes is one row.';
+  $('#kEvC').innerHTML = kChips('ev', [['', 'All', tot], ['restart', 'Restarts', c.restart || 0], ['stopped', 'Stops', c.stopped || 0], ['started', 'Starts', c.started || 0], ['limit', 'Memory limit', c.limit || 0]]);
+  $('#tEv').innerHTML = '<tr><th>When</th><th>Container</th><th>What</th></tr>' + (KE.rows.length ? KE.rows.map(e => '<tr class="click" data-c="' + esc(e.name) + '"><td class="m">' + esc(when(e.last_at)) + (e.n > 1 ? '<div class="sub">first ' + esc(when(e.first_at)) + '</div>' : '') + '</td><td><b>' + esc(e.name) + '</b></td>' +
+    '<td><span class="tag ' + (EVW[e.kind] || ['', e.kind])[0] + '">' + esc((EVW[e.kind] || ['', e.kind])[1]) + (e.n > 1 ? ' ×' + e.n : '') + '</span> ' + (e.detail ? (e.n > 1 ? '<span class="m">latest:</span> ' : '') + esc(e.detail) : '') + '</td></tr>').join('')
+    : '<tr><td colspan="3" class="m">Nothing ' + (KF.ev ? 'of that kind ' : '') + 'restarted, stopped or hit a limit ' + kRangeWords() + '.</td></tr>');
+  $('#kEvM').innerHTML = KE.next ? '<div class="kmore"><span>Showing ' + KE.rows.length + ' rows, newest first</span><button class="btn" id="kEvMore">Show ' + 25 + ' more</button></div>' : '';
+}
+
+// a small line of a series over the range, for a KPI tile
+function kSpark(a) {
+  const v = (a || []).map(x => x === null ? null : +x), ok = v.filter(x => x !== null); if (ok.length < 2) return '';
+  const top = Math.max(...ok) || 1, n = v.length, X = i => (i / (n - 1) * 100).toFixed(2), Y = x => (28 - x / top * 26).toFixed(2);
+  let d = '', pen = false; v.forEach((x, i) => { if (x === null) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i) + ',' + Y(x); pen = true; });
+  return '<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="' + d + '"/></svg>';
+}
+
+/* What is going on: the page's numbers turned into a few plain sentences, worst first. Each names
+   what to look at and, when it is one container, opens it on a click. Nothing here is new data: it
+   reads the same alerts, samples, events and sizing the panels show. */
+function kInsights() {
+  const r = CTR, h = r.host, S = r.series, t = S.t, out = [], add = (lvl, html, c) => out.push({ lvl, html, c });
+  const run = r.containers.filter(c => c.running), z = r.sizing, b = s => '<b>' + esc(s) + '</b>';
+  if (!h.ok || h.stale) add('bad', 'cAdvisor on this host is not answering' + (h.error ? ': ' + esc(h.error) : '') + '. The numbers below stop at ' + esc(when(h.last_ok || h.last_seen)) + '.');
+  const stopped = r.containers.filter(c => !c.running);
+  if (stopped.length) add('bad', stopped.length + (stopped.length === 1 ? ' container is' : ' containers are') + ' stopped: ' + stopped.slice(0, 4).map(c => b(c.name)).join(', ') + (stopped.length > 4 ? ' and ' + (stopped.length - 4) + ' more' : '') + '.', stopped.length === 1 ? stopped[0].name : '');
+  const svc = (r.alerts || []).filter(a => a.kind === 'service');
+  if (svc.length) add('bad', svc.length + ' service ' + (svc.length === 1 ? 'alert' : 'alerts') + ' from Prometheus, for example: ' + esc(svc[0].title) + '.');
+  // restarts: many at once is one cause (a deploy, the host); a few spread out are each their own
+  const rs = (r.marks || []).filter(m => m.kind === 'restart').sort((a, b) => a.at - b.at);
+  if (rs.length) {
+    let best = [], i0 = 0;
+    for (let i = 0; i < rs.length; i++) { while (rs[i].at - rs[i0].at > 600000) i0++; const w = rs.slice(i0, i + 1); if (new Set(w.map(m => m.name)).size > new Set(best.map(m => m.name)).size) best = w; }
+    const names = [...new Set(best.map(m => m.name))], all = [...new Set(rs.map(m => m.name))];
+    if (names.length >= 3) add('warn', b(names.length + ' containers') + ' restarted within 10 minutes around ' + esc(new Date(best[0].at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '. Many at once usually means a deploy or something on the host, not each service failing.');
+    else add(all.length > 2 ? 'warn' : 'info', all.slice(0, 3).map(b).join(', ') + (all.length > 3 ? ' and ' + (all.length - 3) + ' more' : '') + ' restarted ' + kRangeWords() + '.', all.length === 1 ? all[0] : '');
+  }
+  // memory: at or near a limit, then over-commit, then what is growing toward one
+  const lim = new Map(); (r.marks || []).filter(m => m.kind === 'limit').forEach(m => lim.set(m.name, (lim.get(m.name) || 0) + m.n));
+  run.filter(c => c.mem_limit && (c.mem / c.mem_limit >= 0.9 || lim.get(c.name))).sort((a, b) => b.mem / b.mem_limit - a.mem / a.mem_limit).slice(0, 3).forEach(c =>
+    add('bad', b(c.name) + ' is at ' + Math.round(c.mem / c.mem_limit * 100) + '% of its ' + esc(bytes(c.mem_limit)) + ' memory limit' + (lim.get(c.name) ? ' and hit it ' + lim.get(c.name) + (lim.get(c.name) === 1 ? ' time' : ' times') + ' ' + kRangeWords() : '') + '. Raise the limit' + (z && (z.containers.find(x => x.name === c.name) || {}).suggest ? ' to about ' + esc(bytes(z.containers.find(x => x.name === c.name).suggest)) : '') + '.', c.name));
+  if (z) {
+    z.containers.filter(x => x.grow).slice(0, 2).forEach(x => add(x.grow.days < 3 ? 'bad' : 'warn', b(x.name) + '\'s memory grows ' + esc(bytes(x.grow.per_day)) + ' a day and ' + (x.grow.against === 'limit' ? 'reaches its limit' : 'uses up the host') + ' in about ' + Math.max(1, Math.round(x.grow.days)) + (Math.round(x.grow.days) === 1 ? ' day' : ' days') + '.', x.name));
+    if (z.memory && z.limits > z.memory) add('warn', 'Memory limits add up to ' + b(bytes(z.limits)) + ' on a ' + esc(bytes(z.memory)) + ' host. If several containers grow at once, the host runs out before they reach their limits.');
+    const spare = z.containers.filter(x => x.mem === 'spare').reduce((a, x) => a + x.limit - x.suggest, 0);
+    if (spare >= 512 * 1048576) add('info', 'Lowering ' + z.containers.filter(x => x.mem === 'spare').length + ' generous limits would give back ' + b(bytes(spare)) + ' (see Sizing and headroom).');
+  }
+  run.filter(c => c.throttle >= 0.25).slice(0, 2).forEach(c => add('warn', b(c.name) + ' is held back by its CPU limit ' + Math.round(c.throttle * 100) + '% of the time.', c.name));
+  // the host: how full, and its biggest spike with who caused it
+  const hc = kLast(S.cpu['']), hm = kLast(S.mem['']), cp = hc !== null && h.cores ? hc / h.cores : null, mp = hm !== null && h.memory ? hm / h.memory : null;
+  if (cp !== null && cp >= 0.85 || mp !== null && mp >= 0.85) add('bad', 'The host is nearly full: CPU ' + Math.round(cp * 100) + '%, memory ' + Math.round(mp * 100) + '%.');
+  else if (cp !== null && cp >= 0.7 || mp !== null && mp >= 0.7) add('warn', 'The host is getting busy: CPU ' + Math.round(cp * 100) + '%, memory ' + Math.round(mp * 100) + '%.');
+  const hcs = S.cpu[''] || [], okc = hcs.filter(x => x !== null).sort((a, b) => a - b);
+  if (okc.length > 5) {
+    const med = okc[Math.floor(okc.length / 2)], pk = okc[okc.length - 1], pi = hcs.indexOf(pk);
+    if (pk > med * 3 && pk - med >= 0.5) {
+      let who = '', most = 0; for (const c of r.containers) { const v = kBridge(S.cpu[c.name] || [])[pi]; if (v !== null && v !== undefined && v > most) { most = v; who = c.name; } }
+      // a spike no container shares came from outside them: the host itself, Docker or a backup
+      const own = who && most >= (pk - med) * 0.25;
+      add(own ? 'info' : 'warn', 'Host CPU spiked to ' + b(cpuTxt(pk)) + ' at ' + esc(new Date(t[pi]).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + ' (usually ' + esc(cpuTxt(med)) + ')' +
+        (own ? ', mostly ' + b(who) + ' at ' + esc(cpuTxt(most)) + '.' : '. No container rose with it, so it came from outside them: the host itself, Docker, or a job such as a backup or antivirus scan.'), own ? who : '');
+    }
+  }
+  // who uses the most, so the picture has a scale
+  const top = run.slice().sort((a, b) => (b.mem || 0) - (a.mem || 0))[0];
+  if (top && h.memory) add('info', b(top.name) + ' uses the most memory: ' + esc(bytes(top.mem)) + ', ' + Math.round(top.mem / h.memory * 100) + '% of the host.', top.name);
+  if (!out.some(x => x.lvl === 'bad' || x.lvl === 'warn')) out.unshift({ lvl: 'ok', html: 'All ' + run.length + ' containers are running within their limits' + (cp !== null ? ', and the host has room: CPU ' + Math.round(cp * 100) + '%, memory ' + Math.round(mp * 100) + '%' : '') + '.' });
+  const rank = { bad: 0, warn: 1, ok: 2, info: 3 };
+  return out.sort((a, b) => rank[a.lvl] - rank[b.lvl]);
+}
+function renderInsights() {
+  const ins = kInsights(), worst = ins[0] ? ins[0].lvl : 'ok', bad = ins.filter(x => x.lvl === 'bad').length, warn = ins.filter(x => x.lvl === 'warn').length;
+  $('#kInsT').className = 'kstate ' + worst; $('#kInsT').textContent = worst === 'bad' ? 'Needs action' : worst === 'warn' ? 'Worth a look' : 'Healthy';
+  const st = $('#kConState'); if (st) { st.className = 'kc-pill state ' + worst; st.innerHTML = '<i></i>' + $('#kInsT').textContent; }
+  $('#kInsS').textContent = (bad || warn ? [bad && bad + ' to act on', warn && warn + ' to keep an eye on'].filter(Boolean).join(', ') + '. ' : '') + 'Worked out from the numbers on this page, ' + kRangeWords() + '.';
+  $('#kIns').innerHTML = ins.map(x => '<div class="ki ' + x.lvl + (x.c ? ' click' : '') + '"' + (x.c ? ' data-c="' + esc(x.c) + '"' : '') + '><span class="ic">' + ({ bad: '!', warn: '!', ok: '✓', info: 'i' })[x.lvl] + '</span><span>' + x.html + '</span></div>').join('');
+}
+
+/* What changed lately: for the measure picked, each container's last stretch (the last sixth of the
+   range, at least 3 readings) against the rest of it. Small moves are left out, so this lists what a
+   person would notice, up or down. */
+const KMIN = { cpu: 0.02, mem: 20 * 1048576, rx: 5120, tx: 5120, rd: 5120, wr: 5120, throttle: 0.05 };
+function renderChanges() {
+  const m = KM.find(x => x[0] === K.metric) || KM[0], S = CTR.series[m[0]], n = CTR.series.t.length, k = Math.max(3, Math.round(n / 6));
+  const mean = a => { const v = a.filter(x => x !== null); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : null; };
+  const rows = [];
+  for (const c of CTR.containers.filter(kMatch)) {
+    const v = S[c.name]; if (!v || n < 8) continue;
+    const now = mean(v.slice(n - k)), before = mean(v.slice(0, n - k));
+    if (now === null || before === null || Math.abs(now - before) < KMIN[m[0]]) continue;
+    rows.push({ c, now, before, d: now - before, x: before > 0 ? now / before : Infinity, v });
+  }
+  rows.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+  const lastFor = (CTR.series.t[n - 1] - CTR.series.t[n - k]) / 60000;
+  $('#kChgS').textContent = m[1] + ': the last ' + (lastFor < 90 ? Math.round(lastFor) + ' minutes' : Math.round(lastFor / 60) + ' hours') + ' against earlier in the range. Biggest moves first.';
+  const fx = r => r.x === Infinity ? 'new' : r.x >= 1.95 ? r.x.toFixed(1) + '×' : r.d < 0 ? '−' + Math.round((1 - r.x) * 100) + '%' : '+' + Math.round((r.x - 1) * 100) + '%';
+  $('#kChg').innerHTML = rows.length ? rows.slice(0, 9).map(r => '<div class="kc click' + (K.focus === r.c.name ? ' picked' : '') + '" data-c="' + esc(r.c.name) + '"><span class="ar ' + (r.d > 0 ? 'up' : 'down') + '">' + (r.d > 0 ? '▲' : '▼') + '</span>' +
+    '<span class="nm"><b><span class="sw" style="background:' + (kColors.get(r.c.name) || OTHER) + '"></span>' + esc(r.c.name) + '</b><small>' + esc(m[3](r.before)) + ' → ' + esc(m[3](r.now)) + '</small></span>' + kSpark(r.v) + '<span class="fx ' + (r.d > 0 ? 'up' : 'down') + '">' + esc(fx(r)) + '</span></div>').join('')
+    : '<div class="kok"><span class="dot"></span>Nothing moved much. Every container\'s ' + esc(m[1].toLowerCase()) + ' is about where it was earlier in the range.</div>';
+}
+
+// Where the host goes: one bar each for memory and CPU, cut into the coloured containers and Other
+function renderSplit() {
+  const h = CTR.host, run = CTR.containers.filter(c => c.running);
+  const one = (title, key, total, fmt, head) => {
+    const items = run.map(c => ({ n: c.name, v: c[key] || 0 })).filter(o => o.v > 0).sort((a, b) => b.v - a.v);
+    const sum = items.reduce((s, o) => s + o.v, 0), cap = Math.max(total || 0, sum) || 1, rest = items.filter(o => !kColors.has(o.n));
+    const segs = items.filter(o => kColors.has(o.n)).map(o => ({ n: o.n, v: o.v, color: kColors.get(o.n) }));
+    if (rest.length) segs.push({ n: 'Other (' + rest.length + ')', v: rest.reduce((s, o) => s + o.v, 0), color: OTHER, other: true });
+    const pct = v => v / cap * 100;
+    return '<div><div class="sh"><b>' + title + '</b><span>' + esc(head(sum, total)) + '</span></div>' +
+      '<div class="sbar">' + segs.map(s => '<div data-seg="' + esc(s.n) + '" data-v="' + esc(fmt(s.v) + (total ? ', ' + (pct(s.v) < 1 ? pct(s.v).toFixed(1) : Math.round(pct(s.v))) + '% of the host' : '')) + '"' + (s.other ? '' : ' data-c="' + esc(s.n) + '"') +
+        ' style="width:' + pct(s.v).toFixed(2) + '%;background:' + s.color + '"></div>').join('') + '</div>' +
+      '<div class="slg">' + segs.map(s => '<span' + (s.other ? ' class="o"' : ' data-c="' + esc(s.n) + '"') + '><i style="background:' + s.color + '"></i>' + esc(s.n) + ' <b>' + esc(fmt(s.v)) + '</b></span>').join('') + '</div></div>';
+  };
+  $('#kSplit').innerHTML =
+    one('Memory', 'mem', h.memory, bytes, (s, t) => bytes(s) + ' in containers' + (t ? ' of ' + bytes(t) + ' · ' + Math.round(s / t * 100) + '%' : '')) +
+    one('CPU', 'cpu', h.cores, cpuTxt, (s, t) => s.toFixed(s < 1 ? 2 : 1) + ' cores in containers' + (t ? ' of ' + t + ' · ' + Math.round(s / t * 100) + '%' : ''));
+}
+
+// The focus panel: the whole host, or the one container picked, as quiet single-subject charts.
+// In and out share a chart: in above the line, out below it.
+let kOneG = [];
+// the console: the tiles pick the measure; the main chart, the changes and the heatmap all follow it
+const renderConsole = () => { renderTiles(); renderOne(); renderHeat(); renderChanges(); };
+const kBin = m => m[3] === bytes || m[3] === rate;
+// one tile a measure, for the host or the service looked at: now, its shape over the range, and what it means
+function renderTiles() {
+  const h = CTR.host, S = CTR.series, c = K.focus ? CTR.containers.find(x => x.name === K.focus) : null, key = c ? c.name : '';
+  const peak = a => Math.max(0, ...(a || []).filter(x => x !== null));
+  $('#kTiles').innerHTML = KM.map(m => {
+    const v = (S[m[0]] || {})[key], now = kLast(v);
+    let sub = v ? 'peak ' + m[3](peak(v)) : c ? 'no readings' : 'per service only';
+    if (now !== null && m[0] === 'cpu') sub = c ? (now >= 1 ? (now).toFixed(1) + ' cores' : 'of one core') + ' · peak ' + cpuTxt(peak(v)) : h.cores ? Math.round(now / h.cores * 100) + '% of ' + h.cores + ' cores' : sub;
+    if (now !== null && m[0] === 'mem') { const lim = c ? c.mem_limit : h.memory; if (lim) sub = Math.round(now / lim * 100) + '% of ' + (c ? 'its limit ' : '') + bytes(lim); }
+    return '<button class="kt' + (K.metric === m[0] ? ' on' : '') + '" data-km="' + m[0] + '"><span class="kt-l">' + esc(m[1]) + '</span><b>' + esc(now === null ? '–' : axT(m[3](now))) + '</b><small>' + esc(sub) + '</small>' + (v ? kSpark(v) : '<span class="spark"></span>') + '</button>';
+  }).join('');
+}
+function renderOne() {
+  const h = CTR.host, S = CTR.series, c = K.focus ? CTR.containers.find(x => x.name === K.focus) : null, key = c ? c.name : '';
+  const m = KM.find(x => x[0] === K.metric) || KM[0], col = c ? kColors.get(c.name) || PAL[0] : '#3a3733';
+  $('#kOneT').innerHTML = (c ? '<span class="sw" style="background:' + col + '"></span>' + esc(c.name) : 'Whole host') + ' <span class="kc-m">· ' + esc(m[1]) + '</span>';
+  const thr = c ? (S.throttle[key] || []).filter(v => v !== null) : [];
+  $('#kOneS').innerHTML = c ? [esc(c.image), c.running ? 'up ' + upFor(c.started_at) : '<b class="bad">stopped</b>', (c.restarts || 0) + (c.restarts === 1 ? ' restart' : ' restarts'), c.mem_limit ? 'memory limit ' + bytes(c.mem_limit) : 'no memory limit',
+    thr.length && Math.max(...thr) > 0.01 ? 'CPU limit held it back up to ' + Math.round(Math.max(...thr) * 100) + '% of the time' : ''].filter(Boolean).join(' · ')
+    : 'Every container together' + (h.cores ? ' on ' + h.cores + ' cores' : '') + (h.memory ? ' and ' + bytes(h.memory) : '') + '. Pick a service, a measure and a time; drag across the chart or the rows to zoom in.';
+  $('#kOneX').innerHTML = c ? '<button class="btn" data-c="' + esc(c.name) + '">✕ Whole host</button>' : '';
+  const lim = m[0] === 'mem' ? (c ? c.mem_limit : h.memory) : m[0] === 'cpu' && !c ? h.cores : 0;
+  kOneG = [{ title: m[1], parts: [{ v: (S[m[0]] || {})[key], label: m[1] }], fmt: m[3], min: m[4], bin: kBin(m), limit: lim, note: m[0] === 'cpu' ? (c ? '100% is one core' : '100% is one core; the host has ' + h.cores) : m[2] }];
+  kOneG.forEach(g => g.parts.forEach(p => { p.v = p.v || CTR.series.t.map(() => null); p.color = col; }));
+  if (!c && m[0] === 'throttle') { $('#kOneC').innerHTML = '<div class="karea big"><div class="cv"><div class="empty">CPU throttling is per service: how often its CPU limit held it back. Pick a service above, or a row below.</div></div></div>'; return; }
+  $('#kOneC').innerHTML = '<div class="karea big"><div class="cv" data-g="0"></div><div class="knote" data-n="0"></div></div>';
+  kOneDraw();
+}
+const kOneDraw = () => document.querySelectorAll('#kOneC .cv').forEach(el => kArea(el, kOneG[+el.dataset.g]));
+
+// a missed minute or two (a reading that landed in the next bucket) is bridged, so lines do not break apart
+const kBridge = v => v.map((x, i) => {
+  if (x !== null) return x;
+  let a = i - 1, b = i + 1; while (a >= 0 && v[a] === null && i - a < 3) a--; while (b < v.length && v[b] === null && b - i < 3) b++;
+  return a >= 0 && b < v.length && v[a] !== null && v[b] !== null ? v[a] + (v[b] - v[a]) * (i - a) / (b - a) : null;
+});
+// a smooth curve that never rises above a peak or dips below zero (monotone cubic)
+function kCurve(p) {
+  const n = p.length, f = q => q[0].toFixed(1) + ',' + q[1].toFixed(1);
+  if (n < 3) return p.map((q, i) => (i ? 'L' : 'M') + f(q)).join('');
+  const s = [], m = [];
+  for (let i = 0; i < n - 1; i++) s.push((p[i + 1][1] - p[i][1]) / (p[i + 1][0] - p[i][0]));
+  m[0] = s[0]; m[n - 1] = s[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = s[i - 1] * s[i] <= 0 ? 0 : 2 * s[i - 1] * s[i] / (s[i - 1] + s[i]);
+  let d = 'M' + f(p[0]);
+  for (let i = 0; i < n - 1; i++) { const k = (p[i + 1][0] - p[i][0]) / 3; d += 'C' + f([p[i][0] + k, p[i][1] + m[i] * k]) + ' ' + f([p[i + 1][0] - k, p[i + 1][1] - m[i + 1] * k]) + ' ' + f(p[i + 1]); }
+  return d;
+}
+// the top of a scale at a round number in the metric's own unit (256 KB, 2 GB, not 48.8 KB)
+const kTop = (max, bin) => { let u = 1; if (bin) while (max / u >= 1024) u *= 1024; const p = Math.pow(10, Math.floor(Math.log10(max / u))), f = max / u / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p * u; };
+const axT = s => String(s).replace(/\.0(?=\s|%|$)/, '');
+const kTime = (ms, span) => span > 2 * 86400000 ? new Date(ms).toLocaleDateString([], { weekday: 'short', day: 'numeric' })
+  : span > 20 * 3600000 ? new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+// a stretch of time in words: "Oct 27, 9:00 AM – 11:30 AM", "Oct 26, 9:00 PM – Oct 27, 6:00 AM", "Oct 27, 9:00 AM – now"
+const kSpan = (f, t) => {
+  const d = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' }), h = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return d(f) + ', ' + h(f) + ' – ' + (!t ? 'now' : d(t) === d(f) ? h(t) : d(t) + ', ' + h(t));
+};
+let kUid = 0;
+function kArea(el, g) {
+  const t = CTR.series.t, n = t.length, W = Math.max(200, el.clientWidth), Hh = Math.max(110, el.clientHeight), L = 52, R = 4, T = 6, B = 20, pw = W - L - R, ph = Hh - T - B;
+  const vals = p => p.v.filter(x => x !== null), note = el.parentNode.querySelector('.knote');
+  if (!g.parts.some(p => vals(p).length)) { el.innerHTML = '<div class="empty">' + (CTR.range === 'custom' ? 'No numbers in this stretch: cAdvisor was not being read then.' : CTR.host.ok ? 'No numbers in this range yet.' : 'cAdvisor is not reporting.') + '</div>'; el._a = null; note.textContent = ''; return; }
+  const peak = ps => Math.max(0, ...ps.flatMap(vals)), up = g.parts.filter(p => !p.neg), dn = g.parts.filter(p => p.neg);
+  // a limit far above what is used would flatten the line, so then it is only named under the chart
+  const lim = g.limit && g.limit <= peak(up) * 2.2 ? g.limit : 0;
+  let tu = kTop(Math.max(g.min, peak(up) * 1.08, lim * 1.04), g.bin), td = 0;
+  if (dn.length) { td = kTop(Math.max(g.min, peak(dn) * 1.08), g.bin); tu = td = Math.max(tu, td); }
+  const tot = tu + td, y0 = T + ph * tu / tot, x = i => L + (n < 2 ? pw / 2 : i / (n - 1) * pw), y = (v, neg) => neg ? y0 + v / tot * ph : y0 - v / tot * ph;
+  const id = 'ka' + (++kUid);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" role="img" aria-label="' + esc(g.title) + '"><defs>' +
+    '<linearGradient id="' + id + 'u" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + g.parts[0].color + '" stop-opacity=".34"/><stop offset="1" stop-color="' + g.parts[0].color + '" stop-opacity=".02"/></linearGradient>' +
+    '<linearGradient id="' + id + 'd" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="' + g.parts[0].color + '" stop-opacity=".2"/><stop offset="1" stop-color="' + g.parts[0].color + '" stop-opacity=".02"/></linearGradient></defs>';
+  const tick = (v, neg) => '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v, neg) + '" y2="' + y(v, neg) + '"/><text class="ax" x="' + (L - 8) + '" y="' + (y(v, neg) + 3.5) + '" text-anchor="end">' + esc(axT(g.fmt(v))) + '</text>';
+  s += tick(tu) + tick(tu / 2) + (td ? tick(td / 2, true) + tick(td, true) : '');
+  s += '<text class="ax" x="' + (L - 8) + '" y="' + (y0 + 3.5) + '" text-anchor="end">0</text>';
+  for (const p of g.parts) {
+    const v = kBridge(p.v); let run = [];
+    const flush = () => {
+      if (run.length === 1) s += '<circle cx="' + run[0][0].toFixed(1) + '" cy="' + run[0][1].toFixed(1) + '" r="2.5" fill="' + p.color + '"/>';
+      else if (run.length) { const d = kCurve(run); s += '<path d="' + d + 'L' + run[run.length - 1][0].toFixed(1) + ',' + y0 + 'L' + run[0][0].toFixed(1) + ',' + y0 + 'Z" fill="url(#' + id + (p.neg ? 'd' : 'u') + ')"/><path class="ln' + (p.neg ? ' neg' : '') + '" d="' + d + '" stroke="' + p.color + '"/>'; }
+      run = [];
+    };
+    v.forEach((a, i) => { if (a === null) flush(); else run.push([x(i), y(a, p.neg)]); }); flush();
+  }
+  s += '<line class="zero" x1="' + L + '" x2="' + (W - R) + '" y1="' + y0 + '" y2="' + y0 + '"/>';
+  if (lim) s += '<line class="lim" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(lim) + '" y2="' + y(lim) + '"/><text class="lt" x="' + (W - R - 4) + '" y="' + (y(lim) - 5) + '" text-anchor="end">' + esc((CTR.host && !K.focus ? 'host ' : 'limit ') + g.fmt(lim)) + '</text>';
+  if (dn.length) s += '<text class="side" x="' + (L + 8) + '" y="' + (T + 12) + '">↑ ' + esc(up[0].label) + '</text><text class="side" x="' + (L + 8) + '" y="' + (T + ph - 6) + '">↓ ' + esc(dn[0].label) + '</text>';
+  const span = t[n - 1] - t[0];
+  for (let k = 0; k < 4; k++) { const i = Math.round(k / 3 * (n - 1)); s += '<text class="ax" x="' + x(i) + '" y="' + (Hh - 4) + '" text-anchor="' + (k === 0 ? 'start' : k === 3 ? 'end' : 'middle') + '">' + esc(kTime(t[i], span)) + '</text>'; }
+  el.innerHTML = s + '<g class="hov"></g></svg>';
+  // restarts, stops, starts and limit hits in this range: of the container looked at, or of any on the whole host
+  const st = (CTR.step || 60) * 1000, xt = ms => L + (n < 2 ? pw / 2 : (ms - t[0]) / (t[n - 1] - t[0]) * pw);
+  const evs = (CTR.marks || []).filter(e => !K.focus || e.name === K.focus).map(e => Object.assign({ ms: e.at }, e));
+  // limit hits (often one a minute) as a strip along the top; a restart, stop or start as a marked line
+  const hv = el.querySelector('.hov'), bi = ms => Math.max(0, Math.min(n - 1, Math.round((ms - t[0]) / st))), lim2 = new Set(), mark = new Map();
+  for (const e of evs) { const b = bi(e.ms); if (e.kind === 'limit') lim2.add(b); else if (!mark.has(b) || e.kind !== 'started') mark.set(b, e.kind); }
+  const cw = n < 2 ? pw : pw / (n - 1);
+  let ev = [...lim2].map(b => '<rect x="' + (x(b) - cw / 2).toFixed(1) + '" y="' + (T - 3) + '" width="' + cw.toFixed(1) + '" height="4" style="fill:' + KEV_C.limit + '"/>').join('');
+  for (const [b, kind] of mark) { const ex = x(b).toFixed(1), c = KEV_C[kind] || 'var(--grey)';
+    ev += '<line class="evl" x1="' + ex + '" x2="' + ex + '" y1="' + T + '" y2="' + (T + ph) + '" style="stroke:' + c + '"/><path d="M' + (ex - 4.5) + ',' + (T - 3) + 'h9l-4.5,6z" style="fill:' + c + '"/>'; }
+  hv.insertAdjacentHTML('beforebegin', ev);
+  el._a = { g, x, y, T, ph, L, pw, evs, st };
+  note.textContent = g.limit && !lim ? (K.focus ? 'Limit ' : 'Host has ') + g.fmt(g.limit) + ', far above this' : g.note || '';
+}
+// the same minute marked on every chart of the focus panel; the numbers for the chart under the pointer
+// drag across a focus chart or the heatmap to zoom into that time
+let kDrag = null, kDragged = false;
+function kDragIdx(e, d) {
+  const b = d.box, n = CTR.series.t.length;
+  return d.kind === 'heat' ? Math.max(0, Math.min(n - 1, Math.floor((e.clientX - b.left) / b.width * n)))
+    : Math.max(0, Math.min(n - 1, Math.round((e.clientX - b.left - d.a.L) / d.a.pw * (n - 1))));
+}
+function kDragDraw() {
+  const d = kDrag, lo = Math.min(d.i0, d.i1), hi = Math.max(d.i0, d.i1), n = CTR.series.t.length;
+  if (d.kind === 'heat') {
+    const hb = $('#kHeat').getBoundingClientRect(), sel = $('#kHeat .ksel');
+    sel.hidden = false; sel.style.left = (d.box.left - hb.left + lo / n * d.box.width) + 'px'; sel.style.width = ((hi - lo + 1) / n * d.box.width) + 'px';
+    return;
+  }
+  document.querySelectorAll('#kOneC .cv').forEach(el => {
+    const a = el._a, g = el.querySelector('.hov'); if (!a || !g) return;
+    g.innerHTML = '<rect class="zsel" x="' + a.x(lo) + '" y="' + a.T + '" width="' + Math.max(1, a.x(hi) - a.x(lo)) + '" height="' + a.ph + '"/>';
+  });
+}
+// show from f to t (ms); at least 10 minutes, never past now; an end within 90 s of now keeps following now
+function kZoom(f, t) {
+  const now = Date.now();
+  t = Math.min(t, now);
+  if (t - f < 600000) { const mid = (f + t) / 2; f = mid - 300000; t = Math.min(now, mid + 300000); if (t - f < 600000) f = t - 600000; }
+  if (K.range !== 'custom') K.prev = K.range;
+  K.range = 'custom'; K.from = Math.round(f); K.to = now - t < 90000 ? 0 : Math.round(t);
+  saveK(); kPop(false); loadCtr();
+}
+function kAreaHover(e, cv) {
+  const t = CTR.series.t, k = cv._a, box = cv.getBoundingClientRect();
+  const i = Math.max(0, Math.min(t.length - 1, Math.round((e.clientX - box.left - k.L) / k.pw * (t.length - 1))));
+  document.querySelectorAll('#kOneC .cv').forEach(el => {
+    const a = el._a, g = el.querySelector('.hov'); if (!a || !g) return;
+    g.innerHTML = '<line class="cross" x1="' + a.x(i) + '" x2="' + a.x(i) + '" y1="' + a.T + '" y2="' + (a.T + a.ph) + '"/>' +
+      a.g.parts.filter(p => p.v[i] !== null).map(p => '<circle class="pt" cx="' + a.x(i) + '" cy="' + a.y(p.v[i], p.neg) + '" r="4" fill="' + p.color + '"/>').join('');
+  });
+  kTip('<b>' + esc(new Date(t[i]).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })) + '</b>' + k.g.parts.map(p => '<div class="row"><span>' + esc(p.label) + '</span><span>' + esc(p.v[i] === null ? 'no reading' : k.g.fmt(p.v[i])) + '</span></div>').join('') +
+    kEvTip(k.evs.filter(v => Math.abs(v.ms - t[i]) <= k.st / 2)), e);
+}
+
+// Every container over time: a row each, a cell each minute, darker is busier
+const KRAMP = [[232, 240, 251], [14, 64, 140]];   // pale to deep blue
+const kShade = f => { f = Math.sqrt(Math.max(0, Math.min(1, f))) * (KRAMP.length - 1); const k = Math.min(KRAMP.length - 2, Math.floor(f)), u = f - k; return 'rgb(' + KRAMP[k].map((x, i) => Math.round(x + (KRAMP[k + 1][i] - x) * u)).join(',') + ')'; };
+function renderHeat() {
+  const m = KM.find(x => x[0] === K.metric) || KM[0], S = CTR.series[m[0]], t = CTR.series.t, n = t.length;
+  document.querySelectorAll('[data-km]').forEach(b => b.classList.toggle('on', b.dataset.km === m[0]));
+  const rows = CTR.containers.filter(kMatch).filter(c => S[c.name]).map(c => {
+    const v = kBridge(S[c.name]), ok = v.filter(x => x !== null);
+    return { c, v, peak: ok.length ? Math.max(...ok) : 0, mean: ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : 0 };
+  }).sort((a, b) => b.mean - a.mean || a.c.name.localeCompare(b.c.name));
+  // one scale for every row, so a darker cell is really more; the square root keeps quiet containers' patterns visible
+  const top = Math.max(m[4], ...rows.map(r => r.peak));
+  $('#kHeatS').textContent = m[1] + ', ' + m[2].charAt(0).toLowerCase() + m[2].slice(1) + '. Busiest on top; darkest is ' + m[3](top) + '. Click a row to look at it; drag across the rows to zoom in.';
+  const span = t[n - 1] - t[0];
+  let s = '<div class="hrow hh"><span>Container</span><div class="htime">' + [0, 1, 2, 3, 4].map(k => { const i = Math.round(k / 4 * (n - 1)); return '<span style="left:' + ((i + 0.5) / n * 100).toFixed(2) + '%">' + esc(kTime(t[i], span)) + '</span>'; }).join('') + '</div><span class="hv">Now</span><span class="hv">Peak</span></div>';
+  s += rows.slice(0, kShown('heat', rows.length)).map(r => '<div class="hrow' + (K.focus === r.c.name ? ' picked' : '') + (r.c.running ? '' : ' off') + '" data-c="' + esc(r.c.name) + '"><span class="hn"><i style="background:' + (kColors.get(r.c.name) || OTHER) + '"></i>' + esc(r.c.name) + '</span>' +
+    '<svg viewBox="0 0 ' + n + ' 1" preserveAspectRatio="none" shape-rendering="crispEdges">' + r.v.map((v, i) => v === null ? '' : '<rect x="' + i + '" width=".86" height="1" fill="' + kShade(v / top) + '"/>').join('') + '</svg>' +
+    '<span class="hv">' + esc(r.c.running ? m[3](kLast(r.v)) : 'stopped') + '</span><span class="hv m">' + esc(m[3](r.peak)) + '</span></div>').join('');
+  s += rows.length ? '<div class="hkey"><span>Idle</span><i style="background:linear-gradient(90deg,' + [0, 0.06, 0.25, 0.56, 1].map(kShade).join(',') + ')"></i><span>' + esc(m[3](top)) + '</span><span class="gap">No reading</span><i class="none"></i></div>' : '<div class="m">' + (K.q ? 'No container matches.' : CTR.range === 'custom' ? 'No numbers in this stretch: cAdvisor was not being read then.' : 'No numbers yet.') + '</div>';
+  $('#kHeat').innerHTML = s + '<div class="kguide" hidden></div><div class="ksel" hidden></div>';
+  $('#kHeat')._h = { m, rows: new Map(rows.map(r => [r.c.name, r.v])) };
+  $('#kHeatM').innerHTML = kMore('heat', rows.length);
+}
+// Sizing and headroom: what is heading for a limit, and which memory limits are too tight, missing or too generous
+function renderSizing() {
+  const z = CTR.sizing; if (!z) { $('#kSizeP').hidden = true; return; }
+  $('#kSizeP').hidden = false;
+  const custom = CTR.range === 'custom', live = Date.now() - CTR.to < 600000;
+  const span = custom ? kSpan(CTR.from, live ? 0 : CTR.to) : z.hours >= 144 ? 'the last 7 days' : 'the ' + (z.hours < 2 ? 'last hour' : 'last ' + z.hours + ' hours') + ' (a week once there is one)';
+  if (!z.containers.length) {
+    $('#kSizeS').textContent = 'From ' + span + '. No numbers in this stretch, so nothing to size.';
+    $('#kSizeF').innerHTML = ''; $('#tSize').innerHTML = ''; $('#kSizeM').innerHTML = ''; $('#kSizeP2').innerHTML = ''; return;
+  }
+  const over = z.memory && z.limits > z.memory;
+  $('#kSizeS').innerHTML = 'From ' + span + '. ' + (z.limited ? 'Memory limits add up to <b>' + esc(bytes(z.limits)) + '</b>' + (z.memory ? ' on a ' + esc(bytes(z.memory)) + ' host' : '') + '; ' : '') +
+    'the suggestions below add up to <b>' + esc(bytes(z.suggested)) + '</b>.' + (over ? ' <span class="tag bad">Over-committed by ' + esc(bytes(z.limits - z.memory)) + '</span>' : '');
+  // heading for trouble: steady growth with a date on it
+  const fc = z.containers.filter(x => x.grow || x.fs_day);
+  $('#kSizeF').innerHTML = fc.length ? fc.map(x => '<div class="kfc ' + (x.grow && x.grow.days < 3 ? 'bad' : 'warn') + '" data-c="' + esc(x.name) + '"><b>' + esc(x.name) + '</b>' +
+    (x.grow ? '<span>Memory grows ' + esc(bytes(x.grow.per_day)) + ' a day. ' + (x.grow.against === 'limit' ? 'Reaches its limit' : 'Uses up the host\'s memory') + ' in <em>' + (x.grow.days < 1 ? 'under a day' : x.grow.days < 2 ? 'about a day' : Math.round(x.grow.days) + ' days') + '</em> at this rate.</span>' : '') +
+    (x.fs_day ? '<span>Writes ' + esc(bytes(x.fs_day)) + ' a day to its own disk (logs or temp files?).</span>' : '') + '</div>').join('')
+    : '<div class="kok"><span class="dot"></span>' + (!live ? 'This stretch ends in the past, so no days-left are worked out: steady growth is only judged up to now.' : 'Nothing is growing steadily toward a limit over ' + (custom && CTR.to - CTR.from < 3 * 86400000 ? 'this stretch' : 'the last 3 days') + '.') + '</div>';
+  const pick = z.containers.filter(x => x.mem !== 'ok' || x.cpu !== 'ok'), fine = z.containers.length - pick.length;
+  const all = K.sizeAll ? z.containers : pick, rows = all.slice(0, kShown('size', all.length));
+  const verdict = x => {
+    const t = [];
+    if (x.mem === 'tight') t.push('<span class="tag bad">' + (x.hits ? 'Hit its limit ' + x.hits + (x.hits === 1 ? ' time' : ' times') : 'Within 10% of its limit') + '</span>');
+    if (x.mem === 'none') t.push('<span class="tag warn">No memory limit</span>');
+    if (x.mem === 'spare') t.push('<span class="tag">Can give back ' + esc(bytes(x.limit - x.suggest)) + '</span>');
+    if (x.cpu === 'tight') t.push('<span class="tag warn">CPU limit held it back in ' + Math.round(x.thr_share * 100) + '% of minutes</span>');
+    return t.length ? t.join(' ') : '<span class="tag ok">Right size</span>';
+  };
+  const bar = x => {
+    const cap = x.limit || z.memory || x.peak || 1, w = v => Math.min(100, v / cap * 100).toFixed(1);
+    return '<div class="kbar ' + x.mem + '" title="Usually ' + esc(bytes(x.p95)) + ', peak ' + esc(bytes(x.peak)) + (x.limit ? ' of ' + esc(bytes(x.limit)) : ' of the host\'s ' + esc(bytes(z.memory))) + '"><i style="width:' + w(x.p95) + '%"></i><b style="left:' + w(x.peak) + '%"></b></div>';
+  };
+  $('#tSize').innerHTML = '<tr><th>Container</th><th>Memory against its limit</th><th class="n">Peak</th><th class="n">Limit</th><th class="n">Suggested</th><th>What to do</th></tr>' +
+    (rows.length ? rows.map(x => '<tr class="click' + (K.focus === x.name ? ' picked' : '') + '" data-c="' + esc(x.name) + '"><td><b><span class="sw" style="background:' + (kColors.get(x.name) || OTHER) + '"></span>' + esc(x.name) + '</b></td><td>' + bar(x) + '</td>' +
+      '<td class="n">' + esc(bytes(x.peak)) + '</td><td class="n">' + (x.limit ? esc(bytes(x.limit)) : '<span class="m">none</span>') + '</td><td class="n">' + (x.suggest ? '<b>' + esc(bytes(x.suggest)) + '</b>' : '–') + '</td><td>' + verdict(x) + '</td></tr>').join('')
+      : '<tr><td colspan="6" class="m">Every container\'s memory limit fits what it uses.</td></tr>');
+  $('#kSizeP2').innerHTML = kMore('size', all.length);
+  $('#kSizeM').innerHTML = fine ? '<button class="btn" id="kSizeAll">' + (K.sizeAll ? 'Show only the ones to look at' : 'Show the ' + fine + ' that are fine too') + '</button>' : '';
+}
+// the events of one minute for a tooltip: the same kind for the same container once, with a count
+function kEvTip(list) {
+  const g = new Map();
+  for (const v of list) { const key = v.kind + '|' + v.name, o = g.get(key); if (o) o.n += v.n || 1; else g.set(key, { v, n: v.n || 1 }); }
+  return [...g.values()].slice(0, 6).map(({ v, n }) => '<div class="ev"><i style="background:' + (KEV_C[v.kind] || 'var(--grey)') + '"></i>' + esc((EVW[v.kind] || ['', v.kind])[1] + (n > 1 ? ' ×' + n : '') + (K.focus ? '' : ': ' + v.name)) +
+    (v.detail && n === 1 ? '<small>' + esc(v.detail) + '</small>' : '') + '</div>').join('');
+}
+function kHeatHover(e, svg) {
+  const H2 = $('#kHeat')._h, t = CTR.series.t, n = t.length, b = svg.getBoundingClientRect(), hb = $('#kHeat').getBoundingClientRect();
+  const i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - b.left) / b.width * n))), name = svg.parentNode.dataset.c, v = H2.rows.get(name)[i];
+  const gd = $('#kHeat .kguide'); gd.hidden = false; gd.style.left = (b.left - hb.left + (i + 0.5) / n * b.width) + 'px';
+  kTip('<b>' + esc(name) + '</b><div>' + esc(new Date(t[i]).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })) + '</div><div class="row"><span>' + esc(H2.m[1]) + '</span><span>' + esc(v === null ? 'no reading' : H2.m[3](v)) + '</span></div>', e);
+}
+function kTip(html, e) {
+  const tip = $('#tip'); tip.innerHTML = html; tip.hidden = false;
+  tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + 'px'; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 10) + 'px';
+}
+function kUnhover() {
+  $('#tip').hidden = true;
+  document.querySelectorAll('#kOneC .hov').forEach(g => { g.innerHTML = ''; });
+  const gd = $('#kHeat .kguide'); if (gd) gd.hidden = true;
+}
+// look at one container (or the whole host again); bring the focus panel into view
+const kFocus = (name, scroll) => {
+  K.focus = K.focus === name ? '' : name; renderCtr();
+  if (scroll) $('#kOneP').scrollIntoView({ block: 'start', behavior: 'smooth' });
+};
+$('#kBody').addEventListener('mousedown', e => {
+  if (e.button !== 0 || !CTR || !CTR.series) return;
+  const cv = e.target.closest('#kOneC .cv'), hs = e.target.closest('.hrow[data-c] svg');
+  if (cv && cv._a) kDrag = { kind: 'area', a: cv._a, box: cv.getBoundingClientRect(), x0: e.clientX };
+  else if (hs) kDrag = { kind: 'heat', box: hs.getBoundingClientRect(), x0: e.clientX };
+  else return;
+  kDrag.i0 = kDrag.i1 = kDragIdx(e, kDrag); e.preventDefault();
+});
+window.addEventListener('mousemove', e => {
+  if (!kDrag || (!kDrag.moved && Math.abs(e.clientX - kDrag.x0) < 6)) return;
+  kDrag.moved = true; kDrag.i1 = kDragIdx(e, kDrag); $('#tip').hidden = true; kDragDraw();
+});
+window.addEventListener('mouseup', () => {
+  const d = kDrag; kDrag = null; if (!d) return;
+  const sel = $('#kHeat .ksel'); if (sel) sel.hidden = true;
+  if (!d.moved) return;
+  kDragged = true; setTimeout(() => { kDragged = false; }, 0);   // the click that ends a drag is not a click on a row
+  if (d.i0 === d.i1) { kUnhover(); return; }
+  const t = CTR.series.t, st = (CTR.step || 60) * 1000, lo = Math.min(d.i0, d.i1), hi = Math.max(d.i0, d.i1);
+  kZoom(d.kind === 'heat' ? t[lo] : t[lo] - st / 2, t[hi] + st / 2);
+});
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (kDrag) { kDrag = null; kUnhover(); const sel = $('#kHeat .ksel'); if (sel) sel.hidden = true; }
+  kPop(false);
+});
+$('#kBody').addEventListener('mousemove', e => {
+  if (kDrag && kDrag.moved) return;
+  const cv = e.target.closest('#kOneC .cv'), hs = e.target.closest('.hrow[data-c] svg'), sg = e.target.closest('[data-seg]');
+  if (cv && cv._a) return kAreaHover(e, cv);
+  kUnhover();
+  if (hs) return kHeatHover(e, hs);
+  if (sg) kTip('<b>' + esc(sg.dataset.seg) + '</b><div>' + esc(sg.dataset.v) + '</div>', e);
+});
+$('#kBody').addEventListener('mouseleave', kUnhover);
+$('#kBody').addEventListener('scroll', kUnhover, { passive: true });
+const KIND_K = { container_down: 'Container stopped', container_host_down: 'cAdvisor', container_memory: 'Memory', container_cpu: 'CPU limit', container_restarting: 'Restarts', container_unusual: 'Unusual for this time of day', service: 'Service (Prometheus)', prometheus_down: 'Prometheus' };
+$('#kBody').addEventListener('click', async e => {
+  const k = e.target.closest('[data-kack]');
+  if (k) { k.disabled = true; const r = await api('POST', '/api/alerts/' + k.dataset.kack + '/ack', {}); toast(r.message, !r.ok); return loadCtr(); }
+  if (e.target.closest('#kSizeAll')) { K.sizeAll = !K.sizeAll; KP.size = 0; return renderSizing(); }
+  const pg = e.target.closest('[data-more],[data-all],[data-less]');
+  if (pg) { const l = pg.dataset.more || pg.dataset.all || pg.dataset.less; KP[l] = pg.dataset.less ? 0 : pg.dataset.all ? 1e9 : kShown(l, 1e9) + KPAGE[l]; return KRENDER[l](); }
+  const ch = e.target.closest('[data-chip]');
+  if (ch) { KF[ch.dataset.chip] = ch.dataset.v; KP[ch.dataset.chip] = 0; return KRENDER[ch.dataset.chip](); }
+  const so = e.target.closest('[data-sort]');
+  if (so) { const k = so.dataset.sort; K.desc = K.sort === k ? !K.desc : k !== 'name'; K.sort = k; return renderTable(); }
+  if (e.target.closest('#kEvMore')) { e.target.closest('#kEvMore').disabled = true; return loadEv(true); }
+  const km = e.target.closest('[data-km]'); if (km) { K.metric = km.dataset.km; saveK(); return renderConsole(); }
+  if (kDragged) return;
+  const c = e.target.closest('[data-c]'); if (c) kFocus(c.dataset.c, !c.closest('#kOneP'));
+});
+$('#kOne').addEventListener('change', () => { K.focus = ''; kFocus($('#kOne').value); });
+$('#kHost').addEventListener('change', () => { K.host = $('#kHost').value; K.focus = ''; kColors = null; saveK(); loadCtr(); });
+$('#kRange').addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  if (b.dataset.k === 'custom') return kPop($('#kPop').hidden);
+  kPop(false); K.range = b.dataset.k; saveK(); loadCtr();
+});
+$('#kBack').addEventListener('click', () => { K.range = K.prev; saveK(); loadCtr(); });
+// the custom stretch: From and To, or a quick pick; numbers are kept 8 days
+const kLocal = ms => new Date(ms - new Date(ms).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+function kPop(open) {
+  $('#kPop').hidden = !open; $('#kPopE').textContent = '';
+  if (!open) return;
+  const now = Date.now(), f = CTR && CTR.from ? CTR.from : now - 3600000, t = CTR && CTR.to ? CTR.to : now;
+  $('#kFrom').value = kLocal(f); $('#kTo').value = kLocal(Math.min(t, now));
+  $('#kFrom').min = $('#kTo').min = kLocal(now - 8 * 86400000); $('#kFrom').max = $('#kTo').max = kLocal(now);
+  $('#kFrom').focus();
+}
+$('#kPop').addEventListener('click', e => {
+  const q = e.target.closest('[data-q]'), now = Date.now(), mid = new Date(); mid.setHours(0, 0, 0, 0);
+  if (q) return q.dataset.q === 'today' ? kZoom(+mid, now) : q.dataset.q === 'yesterday' ? kZoom(+mid - 86400000, +mid) : kZoom(now - 48 * 3600000, now);
+  if (e.target.closest('#kPopX')) return kPop(false);
+  if (!e.target.closest('#kPopOk')) return;
+  const f = new Date($('#kFrom').value).getTime(), t = new Date($('#kTo').value).getTime();
+  const err = !f || !t ? 'Pick both a start and an end.' : t <= f ? 'Pick a start before the end.' : t - f < 600000 ? 'Pick at least 10 minutes.'
+    : f < now - 8 * 86400000 ? 'Numbers are kept 8 days. Pick a start after ' + kSpan(now - 8 * 86400000, 1).split(' – ')[0] + '.' : t > now + 60000 ? 'Pick an end that is not in the future.' : '';
+  if (err) { $('#kPopE').textContent = err; return; }
+  kZoom(f, t);
+});
+document.addEventListener('mousedown', e => { if (!$('#kPop').hidden && !e.target.closest('#kPop') && !e.target.closest('#kCust')) kPop(false); });
+$('#kq').addEventListener('input', () => { K.q = $('#kq').value.trim(); if (CTR && CTR.host) renderCtr(); });
+window.addEventListener('resize', () => { if (view === 'ctr' && CTR && CTR.host) kOneDraw(); });
+
 /* ---------------- shell ---------------- */
 $('#hosp').addEventListener('change', () => { H = $('#hosp').value; hospitalChanged(); });
 window.addEventListener('hashchange', route);
 $('#btnOut').addEventListener('click', async () => { await api('POST', '/auth/logout', {}); location.href = '/auth/login'; });
 setInterval(() => { if (view === 'boards' && FLEET && !(es && es.readyState === 1)) loadFleet(); }, 15000);
-setInterval(() => { if (view === 'dash' && !document.hidden) loadDash(true); }, 30000);   // other hospitals have no live stream here   // fallback when the live stream is down
+setInterval(() => { if (view === 'dash' && !document.hidden) loadDash(true); }, 30000);
+setInterval(() => { if (view === 'ctr' && !document.hidden) loadCtr(true); }, 60000);   // a new minute from cAdvisor
 boot();

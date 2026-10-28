@@ -4,7 +4,8 @@
    one outbound connection (https / wss on 443) to the cloud. Nothing here is opened to the internet.
    Up:   every board this PC watches (identity by MAC or serial, room, unit, closet, type, model),
          changes in each board's health (only when something changes, plus a refresh every 5 min),
-         room, unit and closet edits made here, and the result of each command.
+         room, unit and closet edits made here, the result of each command, and the numbers
+         containers.js reads from cAdvisor on the hospital's Docker hosts.
    Down: room, unit and closet edits made in the web app or on another tech's PC, the HCI lock,
          and commands (the Device health fixes, door sign LED, a health check, the morning audit).
    Never sent: screens, screen text, snapshots, device logs. They stay on this PC.
@@ -180,5 +181,5 @@ module.exports = function createCloud(ctx) {
   }
   const isLocked = id => !!C().locks[id];
   if (C().agentId) setTimeout(connect, 3000);
-  return { handle, onTick, isLocked, state: pub, stop: () => { if (sock) sock.close(1000, 'Quit'); } };
+  return { handle, onTick, isLocked, push: out, state: pub, stop: () => { if (sock) sock.close(1000, 'Quit'); } };
 };

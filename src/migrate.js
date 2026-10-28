@@ -20,7 +20,12 @@ async function migrate(url, log, identity) {
       const v = f.replace(/\.sql$/, '');
       if (have.has(v)) continue;
       await c.query('begin');
-      try { await c.query(fs.readFileSync(path.join(dir, f), 'utf8')); await c.query('commit'); n++; log('applied ' + v); }
+      try {
+        await c.query(fs.readFileSync(path.join(dir, f), 'utf8'));
+        // most files record themselves; 004 shipped without that line, so record it here for every file
+        await c.query('insert into br.schema_migrations (version) values ($1) on conflict do nothing', [v]);
+        await c.query('commit'); n++; log('applied ' + v);
+      }
       catch (e) { await c.query('rollback'); throw new Error(v + ': ' + e.message); }
     }
     if (!n) log('database is up to date');

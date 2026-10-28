@@ -16,7 +16,7 @@ const net = require('net');
 const crypto = require('crypto');
 const { execFile, spawn } = require('child_process');
 
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 /* APP holds the program (replaced by updates); ROOT holds this PC's data (boards, health, audit,
    snapshots, tools). They are the same folder unless the Windows service sets BR_DATA_DIR. */
 const APP = __dirname;
@@ -299,6 +299,7 @@ async function tick() {
     if (logs) logs.onTick(devs);
     if (audit) audit.onTick();
     if (cloud) cloud.onTick();
+    if (containers) containers.onTick();
     snapTick();
   } catch (e) {
     log('tick error', e.stack || e);
@@ -894,7 +895,7 @@ const MANUAL_PAGE = path.join(APP, 'public', 'manual.html');
 const AUDIT_PAGE = path.join(APP, 'public', 'audit.html');
 const MANUAL_DIR = path.join(APP, 'public', 'manual');
 const IMG_TYPES = { webp: 'image/webp', png: 'image/png', svg: 'image/svg+xml' };
-let health = null, deploy = null, remote = null, logs = null, audit = null, cloud = null;
+let health = null, deploy = null, remote = null, logs = null, audit = null, cloud = null, containers = null;
 const server = http.createServer(async (req, res) => {
   try {
     // Only answer the dashboard itself: blocks other web pages and DNS rebinding.
@@ -931,6 +932,7 @@ const server = http.createServer(async (req, res) => {
     if (logs && /^\/api\/logs\b/.test(p) && await logs.handle(req, res, p, url)) return;
     if (audit && /^\/api\/audit\b/.test(p) && await audit.handle(req, res, p, url)) return;
     if (cloud && /^\/api\/cloud\b/.test(p) && await cloud.handle(req, res, p, url)) return;
+    if (containers && /^\/api\/containers\b/.test(p) && await containers.handle(req, res, p, url)) return;
     if (remote && (/^\/api\/remote\b/.test(p) || p === '/remote' || p === '/remote.html' || p === '/remote-banner.js') && await remote.handle(req, res, p, url)) return;
     if (req.method === 'GET' && p === '/api/state') return send(res, 200, state());
 
@@ -1170,6 +1172,8 @@ deploy = require('./deploy')({ store, saveStore, R, serialOf, adb, shell, log, R
 logs = require('./logs')({ store, saveStore, R, serialOf, adb, log, ROOT, send, readJson });
 audit = require('./audit')({ store, saveStore, R, serialOf, shell, capture, log, ROOT, send, readJson, health });
 cloud = require('./cloud')({ store, saveStore, R, serialOf, log, VERSION, PORT, send, readJson, health, deploy });
+containers = require('./containers')({ store, saveStore, log, send, readJson });
+containers.setCloud(cloud);
 remote = require('./remote')({ store, saveStore, log, PORT, VERSION, ROOT, APP, send, readJson });
 const saveAll = () => { if (health) health.save(); if (deploy) deploy.save(); if (logs) logs.save(); if (audit) audit.save(); if (remote) remote.save(); };
 process.on('SIGINT', () => { saveAll(); process.exit(0); });

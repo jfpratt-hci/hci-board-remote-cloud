@@ -19,6 +19,7 @@
     <a href="#dash" data-v="dash"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
     <a href="#boards" data-v="boards"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/></svg>Boards</a>
     <a href="#rep" data-v="rep"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 17v-3M12 17v-6M15 17v-4"/></svg>Reports</a>
+    <a href="#ctr" data-v="ctr"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>Containers</a>
     <a href="#pcs" data-v="pcs"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>PCs</a>
     <a href="#people" data-v="people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6.5 6.5 0 0 1 3 6"/></svg>People</a>
     <a href="#log" data-v="log"><svg viewBox="0 0 24 24"><path d="M9 4h10v16H5V8z"/><path d="M9 4v4H5M9 12h6M9 16h6"/></svg>Audit log</a>
@@ -57,6 +58,27 @@
       <div class="tablewrap"><table class="tbl" id="tRep"></table></div>
       <div class="pfoot">HCI ONE Board Remote · 513 271 8100 · hci-tv.com</div>
     </div>
+  </section>
+
+  <!-- backend containers, from cAdvisor through the Board Remote PCs -->
+  <section class="view" id="v-ctr" hidden>
+    <div class="bar ctrbar">
+      <div class="filters">
+        <select id="kHost" class="show" aria-label="Docker host"></select>
+        <select id="kOne" class="show" aria-label="Show one container"></select>
+        <div class="seg" id="kRange"><button data-k="1h">1 h</button><button data-k="6h">6 h</button><button data-k="24h">24 h</button><button data-k="7d">7 days</button><button data-k="custom" id="kCust">Custom</button></div>
+        <button class="btn kback" id="kBack" hidden></button>
+        <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="kq" placeholder="Container or image" spellcheck="false"></label>
+      </div>
+      <div class="sub" id="kSeen"></div>
+      <div class="kpop" id="kPop" hidden>
+        <div class="kpq"><button data-q="today">Today</button><button data-q="yesterday">Yesterday</button><button data-q="48h">Last 2 days</button></div>
+        <div class="kpf"><div class="field"><label for="kFrom">From</label><input type="datetime-local" id="kFrom"></div><div class="field"><label for="kTo">To</label><input type="datetime-local" id="kTo"></div></div>
+        <p class="kpe" id="kPopE" role="alert"></p>
+        <div class="kpb"><span class="sub">Numbers are kept 8 days.</span><button class="btn" id="kPopX">Cancel</button><button class="btn dark" id="kPopOk">Show</button></div>
+      </div>
+    </div>
+    <div class="ctr" id="kBody"></div>
   </section>
 
   <!-- boards -->

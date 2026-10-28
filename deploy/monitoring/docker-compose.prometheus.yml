@@ -1,0 +1,27 @@
+# Prometheus for an existing HCI backend, added without editing the deployment's own docker-compose.yml.
+# add-prometheus.ps1 / add-prometheus.sh put this file next to it, start only this service with
+#   docker compose -p <project> -f docker-compose.yml -f docker-compose.prometheus.yml up -d --no-deps prometheus
+# and write hci-monitoring/prometheus.yml from the services that really answer with metrics.
+# Board Remote runs HCI's alert rules against it read-only (Remote, Backend containers, Prometheus address).
+services:
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.55.1}
+    container_name: hci-prometheus
+    restart: unless-stopped
+    mem_limit: 768m
+    ports:
+      # Prometheus has no sign in: bind it to the address Board Remote reaches, or firewall the port to that PC
+      - ${PROMETHEUS_BIND:-0.0.0.0}:${PROMETHEUS_PORT:-9090}:9090
+    command:
+      - --config.file=/etc/hci-monitoring/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d   # Board Remote compares error logs with a week ago
+      - --storage.tsdb.retention.size=2GB
+    volumes:
+      - ./hci-monitoring:/etc/hci-monitoring:ro
+      - hci-prometheus-data:/prometheus
+    labels:
+      com.hci.one.role: prometheus
+
+volumes:
+  hci-prometheus-data:

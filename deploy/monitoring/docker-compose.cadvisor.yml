@@ -1,0 +1,33 @@
+# cAdvisor for an existing HCI backend (MediaCare and its services), added without editing the
+# deployment's own docker-compose.yml. add-cadvisor.ps1 / add-cadvisor.sh put this file next to it and run
+#   docker compose -p <project> -f docker-compose.yml -f docker-compose.cadvisor.yml up -d --no-deps cadvisor
+# so only cAdvisor starts; nothing else in the deployment is recreated.
+# Board Remote reads it at http://<host>:8098 and sends the numbers to HCI ONE Cloud.
+services:
+  cadvisor:
+    image: ghcr.io/google/cadvisor:${CADVISOR_VERSION:-0.60.6}
+    container_name: hci-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    ports:
+      # cAdvisor listens on 8098 inside too, as on the existing sites (their Prometheus scrapes cadvisor:8098).
+      # It has no sign in: bind it to the address Board Remote reaches, or firewall the port to that PC.
+      - ${CADVISOR_BIND:-0.0.0.0}:${CADVISOR_PORT:-8098}:8098
+    command:
+      - --port=8098
+      - --docker_only=true                 # Docker containers and the host itself, not every cgroup
+      - --housekeeping_interval=10s
+      - --store_container_labels=false     # labels can carry settings; Board Remote never reads them anyway
+      - --disable_metrics=advtcp,cpu_topology,cpuset,hugetlb,memory_numa,percpu,perf_event,process,referenced_memory,resctrl,sched,tcp,udp
+    volumes:
+      - /:/rootfs:ro
+      # the Docker socket itself: Docker Desktop (Windows, Mac) maps this path to its engine; /var/run as a
+      # whole does not reach it everywhere
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    labels:
+      com.hci.one.role: cadvisor

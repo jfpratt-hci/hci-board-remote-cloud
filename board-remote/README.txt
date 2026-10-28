@@ -1,5 +1,14 @@
-HCI ONE BOARD REMOTE  2.1
+HCI ONE BOARD REMOTE  2.2
 One click ADB to every board, live screens, Device Health and Deploy.
+New in 2.2: Backend containers. On Remote, add the cAdvisor address of the
+hospital's Docker host (MediaCare, for example http://192.168.1.20:8098) and
+this PC reads it once a minute and shows every container's CPU, memory,
+network and disk in HCI ONE Cloud, with an alert when one stops. Only those
+numbers leave this PC. Add the host's Prometheus address as well and HCI's
+service alerts (service down, error rate, slow, Java memory, database pool,
+Kong) are checked against it, read only. A host without cAdvisor:
+deploy/monitoring in the cloud project adds it without touching the rest.
+
 New in 2.1: a Windows installer. Board Remote runs as a Windows service, starts
 with Windows, restarts itself, and installs signed updates from HCI ONE Cloud
 overnight (or when approved), rolling back on its own if a version fails to

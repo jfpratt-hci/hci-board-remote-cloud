@@ -5,7 +5,7 @@
    Link: Board Remote dials out to wss://<cloud>/agent and keeps that one connection open. Nothing at
    the hospital is opened to the internet. Over it:
      up    hello (every board it watches), state (heartbeat changes), placement (a room edited
-           locally), result (a command finished)
+           locally), result (a command finished), containers (cAdvisor numbers, see containers.js)
      down  welcome, placement (a room edited in the cloud or by another tech's PC, or the HCI lock),
            command (a fix someone asked for in the web app)
    A board two techs both reach is one device here, matched by MAC or serial. Its state comes from
@@ -29,6 +29,7 @@ const normCode = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const PC_ALERT_MS = Number(process.env.BR_PC_ALERT_MS) || 120000;
 function create(log) {
   log = log || (() => {});
+  let containers = null;           // set by the server once both exist
   const conns = new Map();        // agentId -> { sock, hospitalId, actor }
   const listeners = new Set();     // web app live updates: fn(hospitalId, event)
   const emit = (h, e) => listeners.forEach(fn => { try { fn(h, e); } catch (x) { /* ignore */ } });
@@ -164,6 +165,7 @@ function create(log) {
       if (r && r.changed) { await fanOut(r.deviceId, agentId); emit(k.hospitalId, { t: 'fleet' }); }
       return;
     }
+    if (msg.t === 'containers') { if (containers) await containers.ingest(A, k.hospitalId, agentId, msg); return; }
     if (msg.t === 'result') {
       const r = await db.tx(A, async c => {
         const x = (await c.query("update br.commands set status = $2, result = $3, done_at = now() where id = $1 and agent_id = $4 and status in ('sent', 'queued') returning hospital_id, device_id, action, created_by",
@@ -309,7 +311,7 @@ function create(log) {
     for (const r of rows) send(k, { t: 'command', id: r.id, action: r.action, args: r.args });
   }
 
-  return { upgrade, authAgent, emit, enroll, makeCode, revoke, command, hospitalCommand, fanOut, isOnline: id => conns.has(id), onEvent: fn => { listeners.add(fn); return () => listeners.delete(fn); }, ACTIONS: Object.keys(ACTIONS), ACTS, _conns: conns };
+  return { setContainers: x => { containers = x; }, upgrade, authAgent, emit, enroll, makeCode, revoke, command, hospitalCommand, fanOut, isOnline: id => conns.has(id), onEvent: fn => { listeners.add(fn); return () => listeners.delete(fn); }, ACTIONS: Object.keys(ACTIONS), ACTS, _conns: conns };
 }
 
 module.exports = { create, normCode, PROTO };
