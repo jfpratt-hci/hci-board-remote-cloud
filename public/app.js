@@ -680,6 +680,9 @@ function renderCtr() {
     $('#kBody').innerHTML = '<section class="kcon" id="kOneP" aria-label="Container analytics">' +
       '<div class="kc-head"><div class="kc-title"><span class="kc-live" title="Live: a new minute from cAdvisor every 60 s"></span><div><h2>Container analytics</h2><p id="kOneS"></p></div></div><div class="kc-stats" id="kConStats"></div></div>' +
       '<div class="kc-ctl" id="kConCtl"></div>' +
+      '<div class="kc-time"><div class="kt-nav"><button class="btn" data-tn="back" title="Earlier: move back by half the window">‹ Earlier</button><button class="btn" data-tn="out" title="Zoom out: twice as long">−</button>' +
+      '<button class="btn" data-tn="in" title="Zoom in: half as long">+</button><button class="btn" data-tn="fwd" title="Later: move forward by half the window">Later ›</button><button class="btn" data-tn="now" title="Back to now, same length">Now</button>' +
+      '<span class="kt-span" id="kTSpan"></span></div><div class="kt-track" id="kTrack" title="The 8 days kept. Drag the window to move it, its edges to stretch it, or click to jump there."></div></div>' +
       '<div class="kc-tiles" id="kTiles"></div>' +
       '<div class="kc-main"><div class="kc-card"><div class="kc-ch"><div><span class="kc-k">Viewing</span><h3 id="kOneT"></h3></div><span id="kOneX"></span></div><div id="kOneC"></div></div>' +
       '<div class="kc-card" id="kChgP"><div class="kc-ch"><div><span class="kc-k">What changed lately</span><p id="kChgS"></p></div></div><div class="kchg" id="kChg"></div></div></div>' +
@@ -709,7 +712,7 @@ function renderCtr() {
     pill(rn ? 'warn' : '', '<b>' + rn + '</b> ' + (rn === 1 ? 'restart' : 'restarts')) +
     pill(open ? 'bad' : 'ok', '<b>' + open + '</b> ' + (open === 1 ? 'problem' : 'problems') + ' open') +
     '<span class="kc-pill" id="kConState"></span>';
-  renderInsights(); renderAlerts(); renderSplit(); renderConsole(); renderSizing(); renderTable();
+  renderTime(); renderInsights(); renderAlerts(); renderSplit(); renderConsole(); renderSizing(); renderTable();
   if (kEvKey() !== KE.want) loadEv(false); else renderEv();
 }
 
@@ -796,6 +799,42 @@ function kSpark(a) {
   const top = Math.max(...ok) || 1, n = v.length, X = i => (i / (n - 1) * 100).toFixed(2), Y = x => (28 - x / top * 26).toFixed(2);
   let d = '', pen = false; v.forEach((x, i) => { if (x === null) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i) + ',' + Y(x); pen = true; });
   return '<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="' + d + '"/></svg>';
+}
+
+/* The time navigator: Earlier and Later move the window by half its length, − and + zoom out and in,
+   Now comes back to the present. The strip under them is the 8 days kept, with the window on it:
+   drag the window to move it, its edges to stretch it, or click the strip to jump there. */
+const KEEP = 8 * 86400000;
+function kWin() { const now = Date.now(); return { f: CTR.from, t: K.range === 'custom' && K.to ? CTR.to : now, now, live: !(K.range === 'custom' && K.to) }; }
+function kNav(a) {
+  const { f, t, now } = kWin(), span = t - f, min = now - KEEP + 120000;
+  let nf = f, nt = t;
+  if (a === 'back') { nf = Math.max(min, f - span / 2); nt = nf + span; }
+  if (a === 'fwd') { nt = Math.min(now, t + span / 2); nf = nt - span; }
+  if (a === 'in') { const s2 = Math.max(600000, span / 2); if (now - t < 90000) { nt = now; nf = now - s2; } else { const c = (f + t) / 2; nf = c - s2 / 2; nt = c + s2 / 2; } }
+  if (a === 'out') { const s2 = Math.min(KEEP - 180000, span * 2), c = (f + t) / 2; nt = Math.min(now, c + s2 / 2); nf = Math.max(min, nt - s2); nt = nf + s2 > now ? now : nf + s2; }
+  if (a === 'now') { nt = now; nf = now - span; }
+  kZoom(Math.max(min, nf), nt);
+}
+function renderTime() {
+  const { f, t, now, live } = kWin(), D0 = now - KEEP, pos = ms => Math.max(0, Math.min(100, (ms - D0) / KEEP * 100));
+  const tr = $('#kTrack'); if (!tr) return;
+  const w = tr.clientWidth || 1000, ticks = kTicks(D0, now, w, 70);
+  tr.innerHTML = ticks.map(k => '<span class="tk' + (k.day ? ' day' : '') + '" style="left:' + pos(k.ms) + '%"><em>' + esc(k.text) + '</em></span>').join('') +
+    // too narrow to grab an edge: the whole window moves, and + and − change its length
+    '<div class="kt-win" id="kTWin" style="left:' + pos(f) + '%;width:' + Math.max(0.4, pos(t) - pos(f)) + '%">' + ((pos(t) - pos(f)) / 100 * w >= 28 ? '<i class="h l"></i><i class="h r"></i>' : '') + '</div>';
+  $('#kTSpan').innerHTML = '<b>' + esc(kSpan(f, live ? 0 : t)) + '</b> · ' + esc(kDur(t - f));
+  document.querySelector('[data-tn="fwd"]').disabled = live; document.querySelector('[data-tn="now"]').disabled = live;
+  document.querySelector('[data-tn="back"]').disabled = f <= D0 + 180000;
+  document.querySelector('[data-tn="out"]').disabled = t - f >= KEEP - 240000;
+  document.querySelector('[data-tn="in"]').disabled = t - f <= 660000;
+}
+let kTr = null;
+function kTrackMs(e) { const b = $('#kTrack').getBoundingClientRect(), now = Date.now(); return now - KEEP + Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)) * KEEP; }
+function kTrackShow(f, t) {
+  const now = Date.now(), D0 = now - KEEP, el = $('#kTWin'), pos = ms => (ms - D0) / KEEP * 100;
+  el.style.left = pos(f) + '%'; el.style.width = Math.max(0.4, pos(t) - pos(f)) + '%';
+  $('#kTSpan').innerHTML = '<b>' + esc(kSpan(f, now - t < 90000 ? 0 : t)) + '</b> · ' + esc(kDur(t - f));
 }
 
 /* What is going on: the page's numbers turned into a few plain sentences, worst first. Each names
@@ -960,6 +999,18 @@ const kTop = (max, bin) => { let u = 1; if (bin) while (max / u >= 1024) u *= 10
 const axT = s => String(s).replace(/\.0(?=\s|%|$)/, '');
 const kTime = (ms, span) => span > 2 * 86400000 ? new Date(ms).toLocaleDateString([], { weekday: 'short', day: 'numeric' })
   : span > 20 * 3600000 ? new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+// ticks on round local times (5 min, 1 h, a day...), as many as fit with room for their labels; midnight shows the day
+const KSTEPS = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720, 1440, 2880].map(m => m * 60000);
+function kTicks(f, t, px, gap) {
+  const want = (t - f) / Math.max(1, px / (gap || 84)), step = KSTEPS.find(x => x >= want) || KSTEPS[KSTEPS.length - 1];
+  const tz = new Date(f).getTimezoneOffset() * 60000, out = [];
+  for (let ms = Math.ceil((f - tz) / step) * step + tz; ms <= t; ms += step) {
+    const d = new Date(ms), day = step >= 86400000 || (d.getHours() === 0 && d.getMinutes() === 0);
+    out.push({ ms, day, text: day ? d.toLocaleDateString([], { weekday: 'short', day: 'numeric' }) : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) });
+  }
+  return out;
+}
+const kDur = ms => { const m = Math.round(ms / 60000); return m < 120 ? m + ' minutes' : m < 2880 ? Math.round(m / 60) + ' hours' : (m / 1440).toFixed(m % 1440 ? 1 : 0) + ' days'; };
 // a stretch of time in words: "Oct 27, 9:00 AM – 11:30 AM", "Oct 26, 9:00 PM – Oct 27, 6:00 AM", "Oct 27, 9:00 AM – now"
 const kSpan = (f, t) => {
   const d = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' }), h = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -996,7 +1047,12 @@ function kArea(el, g) {
   if (lim) s += '<line class="lim" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(lim) + '" y2="' + y(lim) + '"/><text class="lt" x="' + (W - R - 4) + '" y="' + (y(lim) - 5) + '" text-anchor="end">' + esc((CTR.host && !K.focus ? 'host ' : 'limit ') + g.fmt(lim)) + '</text>';
   if (dn.length) s += '<text class="side" x="' + (L + 8) + '" y="' + (T + 12) + '">↑ ' + esc(up[0].label) + '</text><text class="side" x="' + (L + 8) + '" y="' + (T + ph - 6) + '">↓ ' + esc(dn[0].label) + '</text>';
   const span = t[n - 1] - t[0];
-  for (let k = 0; k < 4; k++) { const i = Math.round(k / 3 * (n - 1)); s += '<text class="ax" x="' + x(i) + '" y="' + (Hh - 4) + '" text-anchor="' + (k === 0 ? 'start' : k === 3 ? 'end' : 'middle') + '">' + esc(kTime(t[i], span)) + '</text>'; }
+  // time on round minutes, hours or days, with a faint line up from each
+  const tx = ms => L + (n < 2 ? pw / 2 : (ms - t[0]) / (t[n - 1] - t[0]) * pw);
+  for (const k of kTicks(t[0], t[n - 1], pw)) {
+    const xx = tx(k.ms); s += '<line class="vgrid" x1="' + xx + '" x2="' + xx + '" y1="' + T + '" y2="' + (T + ph) + '"/>' +
+      '<text class="ax' + (k.day ? ' day' : '') + '" x="' + xx + '" y="' + (Hh - 4) + '" text-anchor="' + (xx < L + 24 ? 'start' : xx > W - R - 24 ? 'end' : 'middle') + '">' + esc(k.text) + '</text>';
+  }
   el.innerHTML = s + '<g class="hov"></g></svg>';
   // restarts, stops, starts and limit hits in this range: of the container looked at, or of any on the whole host
   const st = (CTR.step || 60) * 1000, xt = ms => L + (n < 2 ? pw / 2 : (ms - t[0]) / (t[n - 1] - t[0]) * pw);
@@ -1066,10 +1122,13 @@ function renderHeat() {
   // one scale for every row, so a darker cell is really more; the square root keeps quiet containers' patterns visible
   const top = Math.max(m[4], ...rows.map(r => r.peak));
   $('#kHeatS').textContent = m[1] + ', ' + m[2].charAt(0).toLowerCase() + m[2].slice(1) + '. Busiest on top; darkest is ' + m[3](top) + '. Click a row to look at it; drag across the rows to zoom in.';
-  const span = t[n - 1] - t[0];
-  let s = '<div class="hrow hh"><span>Container</span><div class="htime">' + [0, 1, 2, 3, 4].map(k => { const i = Math.round(k / 4 * (n - 1)); return '<span style="left:' + ((i + 0.5) / n * 100).toFixed(2) + '%">' + esc(kTime(t[i], span)) + '</span>'; }).join('') + '</div><span class="hv">Now</span><span class="hv">Peak</span></div>';
+  // a cell covers its bucket, so the strip runs from the first bucket's start to the last one's end
+  const st = (CTR.step || 60) * 1000, t0 = t[0], t1 = t[n - 1] + st, at = ms => (ms - t0) / (t1 - t0);
+  const ticks = kTicks(t0, t1, Math.max(200, ($('#kHeat').clientWidth || 900) - 460));
+  const grid = ticks.map(k => '<line x1="' + (at(k.ms) * n).toFixed(3) + '" x2="' + (at(k.ms) * n).toFixed(3) + '" y1="0" y2="1" class="tg' + (k.day ? ' day' : '') + '"/>').join('');
+  let s = '<div class="hrow hh"><span>Container</span><div class="htime">' + ticks.map(k => '<span class="' + (k.day ? 'day' : '') + '" style="left:' + (at(k.ms) * 100).toFixed(2) + '%">' + esc(k.text) + '</span>').join('') + '</div><span class="hv">Now</span><span class="hv">Peak</span></div>';
   s += rows.slice(0, kShown('heat', rows.length)).map(r => '<div class="hrow' + (K.focus === r.c.name ? ' picked' : '') + (r.c.running ? '' : ' off') + '" data-c="' + esc(r.c.name) + '"><span class="hn"><i style="background:' + (kColors.get(r.c.name) || OTHER) + '"></i>' + esc(r.c.name) + '</span>' +
-    '<svg viewBox="0 0 ' + n + ' 1" preserveAspectRatio="none" shape-rendering="crispEdges">' + r.v.map((v, i) => v === null ? '' : '<rect x="' + i + '" width=".86" height="1" fill="' + kShade(v / top) + '"/>').join('') + '</svg>' +
+    '<svg viewBox="0 0 ' + n + ' 1" preserveAspectRatio="none" shape-rendering="crispEdges">' + r.v.map((v, i) => v === null ? '' : '<rect x="' + i + '" width=".86" height="1" fill="' + kShade(v / top) + '"/>').join('') + grid + '</svg>' +
     '<span class="hv">' + esc(r.c.running ? m[3](kLast(r.v)) : 'stopped') + '</span><span class="hv m">' + esc(m[3](r.peak)) + '</span></div>').join('');
   s += rows.length ? '<div class="hkey"><span>Idle</span><i style="background:linear-gradient(90deg,' + [0, 0.06, 0.25, 0.56, 1].map(kShade).join(',') + ')"></i><span>' + esc(m[3](top)) + '</span><span class="gap">No reading</span><i class="none"></i></div>' : '<div class="m">' + (K.q ? 'No container matches.' : CTR.range === 'custom' ? 'No numbers in this stretch: cAdvisor was not being read then.' : 'No numbers yet.') + '</div>';
   $('#kHeat').innerHTML = s + '<div class="kguide" hidden></div><div class="ksel" hidden></div>';
@@ -1195,6 +1254,25 @@ $('#kBody').addEventListener('click', async e => {
   if (kDragged) return;
   const c = e.target.closest('[data-c]'); if (c) kFocus(c.dataset.c, !c.closest('#kOneP'));
 });
+$('#kBody').addEventListener('click', e => { const b = e.target.closest('[data-tn]'); if (b && !b.disabled) kNav(b.dataset.tn); });
+$('#kBody').addEventListener('pointerdown', e => {
+  const tr = e.target.closest('#kTrack'); if (!tr || e.button !== 0 || !CTR || !CTR.host) return;
+  const { f, t } = kWin(), at = kTrackMs(e), h = e.target.closest('.h');
+  kTr = { mode: h ? (h.classList.contains('l') ? 'l' : 'r') : e.target.closest('#kTWin') ? 'move' : 'jump', at, f, t };
+  if (kTr.mode === 'jump') { const span = t - f; kTr.f = at - span / 2; kTr.t = at + span / 2; kTr.mode = 'move'; kTr.at = at; }
+  tr.setPointerCapture(e.pointerId); e.preventDefault(); kTr.nf = kTr.f; kTr.nt = kTr.t; kTrMove(e);
+});
+function kTrMove(e) {
+  if (!kTr) return;
+  const now = Date.now(), min = now - KEEP + 120000, d = kTrackMs(e) - kTr.at, span = kTr.t - kTr.f;
+  let nf = kTr.f, nt = kTr.t;
+  if (kTr.mode === 'move') { nf = kTr.f + d; nt = nf + span; if (nf < min) { nf = min; nt = nf + span; } if (nt > now) { nt = now; nf = nt - span; } }
+  if (kTr.mode === 'l') nf = Math.max(min, Math.min(kTr.t - 600000, kTr.f + d));
+  if (kTr.mode === 'r') nt = Math.min(now, Math.max(kTr.f + 600000, kTr.t + d));
+  kTr.nf = nf; kTr.nt = nt; kTrackShow(nf, nt);
+}
+$('#kBody').addEventListener('pointermove', kTrMove);
+$('#kBody').addEventListener('pointerup', () => { const d = kTr; kTr = null; if (d && (Math.abs(d.nf - kWin().f) > 30000 || Math.abs(d.nt - kWin().t) > 30000)) kZoom(d.nf, d.nt); });
 $('#kOne').addEventListener('change', () => { K.focus = ''; kFocus($('#kOne').value); });
 $('#kHost').addEventListener('change', () => { K.host = $('#kHost').value; K.focus = ''; kColors = null; saveK(); loadCtr(); });
 $('#kRange').addEventListener('click', e => {
@@ -1226,7 +1304,7 @@ $('#kPop').addEventListener('click', e => {
 });
 document.addEventListener('mousedown', e => { if (!$('#kPop').hidden && !e.target.closest('#kPop') && !e.target.closest('#kCust')) kPop(false); });
 $('#kq').addEventListener('input', () => { K.q = $('#kq').value.trim(); if (CTR && CTR.host) renderCtr(); });
-window.addEventListener('resize', () => { if (view === 'ctr' && CTR && CTR.host) kOneDraw(); });
+window.addEventListener('resize', () => { if (view === 'ctr' && CTR && CTR.host) { kOneDraw(); renderTime(); } });
 
 /* ---------------- shell ---------------- */
 $('#hosp').addEventListener('change', () => { H = $('#hosp').value; hospitalChanged(); });

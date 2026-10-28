@@ -350,6 +350,28 @@ body.dopen main{margin-right:416px}
 @media (max-width:1500px){.kc-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:1250px){.kc-main{grid-template-columns:1fr}}
 @media (max-width:700px){.kc-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.kcon{padding:14px}}
+/* time: round ticks with faint gridlines, and the navigator */
+.karea .vgrid{stroke:var(--line);stroke-width:1}
+.karea .ax.day{font-weight:800;fill:var(--ink2)}
+.hrow svg .tg{stroke:var(--card);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.hrow svg .tg.day{stroke:var(--ink2);stroke-width:1.5;opacity:.6}
+.htime span.day{color:var(--ink);font-weight:800}
+.htime span:first-child,.htime span:last-child{transform:translateX(-50%)}
+.kc-time{display:grid;gap:8px}
+.kt-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kt-nav .btn{height:32px;padding:0 12px;font-size:12px;min-width:34px}
+.kt-span{margin-left:8px;font-size:12.5px;color:var(--muted);font-weight:600}
+.kt-span b{color:var(--ink);font-weight:800}
+.kt-track{position:relative;height:38px;border-radius:10px;background:var(--soft);cursor:pointer;touch-action:none;user-select:none;overflow:hidden}
+.kt-track .tk{position:absolute;top:0;bottom:0;border-left:1px solid var(--line)}
+.kt-track .tk em{position:absolute;bottom:4px;left:5px;font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.kt-track .tk.day{border-left-color:var(--grey)}
+.kt-track .tk.day em{color:var(--ink2);font-weight:800}
+.kt-win{position:absolute;top:3px;bottom:3px;min-width:6px;border-radius:7px;background:rgba(30,28,25,.14);box-shadow:inset 0 0 0 2px var(--ink);cursor:grab}
+.kt-win:active{cursor:grabbing}
+.kt-win .h{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize}
+.kt-win .h.l{left:-5px} .kt-win .h.r{right:-5px}
+.kt-win .h::after{content:'';position:absolute;top:30%;bottom:30%;left:4px;width:2px;border-radius:1px;background:var(--ink)}
 /* the containers dashboard: two columns where they fit, full width where a panel needs it */
 .kdash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;gap:var(--g);align-items:start}
 #kInsP{grid-row:span 2}
@@ -462,8 +484,6 @@ body.dopen main{margin-right:416px}
 .hrow.hh .hv{color:var(--muted);font-weight:700}
 .htime{position:relative;height:14px}
 .htime span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;letter-spacing:0;text-transform:none;font-weight:600}
-.htime span:first-child{transform:none}
-.htime span:last-child{transform:translateX(-100%)}
 .kguide{position:absolute;top:22px;bottom:30px;width:1px;background:var(--ink);opacity:.55;pointer-events:none}
 .hkey{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:12px;font-size:11.5px;font-weight:600;color:var(--muted)}
 .hkey i{width:120px;height:10px;border-radius:3px;display:inline-block}
