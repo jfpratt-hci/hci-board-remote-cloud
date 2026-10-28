@@ -92,6 +92,10 @@ Tests: `npm test` (195: token sign in, database, sign in, agent link, concurrenc
 - **Kept** 8 days, one sample per container per minute, in `br.container_samples` behind row level security like everything else.
 - **Adding monitoring to a deployment** that runs only its services (production today): `deploy/monitoring/`. Step 1 `add-cadvisor` (host port 8098), step 2 `add-prometheus` (9090, finds the services that publish metrics and writes its config from them). Each starts only its own container next to the existing compose project, without touching the rest. `.ps1` for Windows Docker Desktop, `.sh` for Linux. See `deploy/monitoring/README.md`.
 
+- **Upgrading a database from 0.3**: migration `004_reports` never recorded itself, so run this once before deploying 0.4.0, or the migrator tries 004 again and stops on "state_log already exists":
+  `insert into br.schema_migrations (version) values ('004_reports') on conflict do nothing;`
+  From 0.4.0 the migrator records every migration it runs.
+
 ## Board Remote for Windows and its updates
 
 This repo also holds Board Remote itself (`board-remote/`) and its Windows installer (`installer/`).
