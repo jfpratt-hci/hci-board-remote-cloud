@@ -137,7 +137,7 @@ const req = (base, method, p, body, headers) => new Promise((resolve, reject) =>
   T('and a wake command runs to done, through PC B', !!d2, (await cloud(itC, 'GET', '/api/commands/' + cmd2.id)).json);
 
   // no PHI: nothing that looks like screen content in the cloud
-  const cols = (await db.tx(db.SYSTEM, c => c.query("select table_name, column_name from information_schema.columns where table_schema = 'br' and (column_name ~ 'shot|screen|snap|image|png|logcat|text$')"))).rows;
+  const cols = (await db.tx(db.SYSTEM, c => c.query("select table_name, column_name from information_schema.columns where table_schema = 'br' and (column_name ~ 'shot|screen|snap|image|png|logcat|text$') and not (table_name = 'containers' and column_name = 'image')"))).rows;   // containers.image is a Docker image name
   T('the cloud database has no column for screens, snapshots, screen text or logs', cols.length === 0, cols);
   const audit = (await cloud(itC, 'GET', '/api/hospitals/' + h + '/audit')).json;
   T('the audit log recorded the edits, lock and commands', audit && (audit.rows || audit.entries || []).length >= 6, audit && Object.keys(audit));

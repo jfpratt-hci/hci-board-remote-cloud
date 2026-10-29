@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Adds cAdvisor (github.com/google/cadvisor) to an existing HCI backend on a Linux Docker host, so Board
 # Remote can show its containers in HCI ONE Cloud. Same steps as add-cadvisor.ps1:
-#   sudo ./add-cadvisor.sh [--dir /opt/hci-mediacare] [--port 8098] [--bind 0.0.0.0] [--version 0.60.6] [--force]
+#   sudo ./add-cadvisor.sh [--dir /opt/hci-mediacare] [--port 8098] --allow <Board Remote PC address>[,<address>] [--bind 0.0.0.0] [--version 0.60.6] [--force]
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; OVERRIDE="$HERE/docker-compose.cadvisor.yml"
-DIR=""; PORT=8098; BIND=0.0.0.0; VERSION=0.60.6; FORCE=0
+DIR=""; PORT=8098; BIND=0.0.0.0; ALLOW=""; OPEN=0; VERSION=0.60.6; FORCE=0
 while [ $# -gt 0 ]; do case "$1" in
-  --dir) DIR="$2"; shift 2;; --port) PORT="$2"; shift 2;; --bind) BIND="$2"; shift 2;; --version) VERSION="$2"; shift 2;; --force) FORCE=1; shift;;
+  --dir) DIR="$2"; shift 2;; --port) PORT="$2"; shift 2;; --bind) BIND="$2"; shift 2;; --allow) ALLOW="$2"; shift 2;; --open) OPEN=1; shift;; --version) VERSION="$2"; shift 2;; --force) FORCE=1; shift;;
   *) echo "Unknown option $1"; exit 1;; esac; done
 say() { echo "  $*"; }; fail() { echo "  $*" >&2; exit 1; }
+. "$HERE/lock-port.sh"; check_allow
 
 echo; echo "HCI ONE: add cAdvisor to this Docker host"; echo
 command -v docker >/dev/null || fail "Docker is not installed."
@@ -17,6 +18,7 @@ docker info >/dev/null 2>&1 || fail "Docker is not running, or this user cannot 
 
 wait_up() { for _ in $(seq 1 30); do curl -fsS -m 3 "http://localhost:$1/healthz" 2>/dev/null | grep -q ok && return 0; sleep 2; done; return 1; }
 show() {
+  lock_port "$1"
   echo; echo "  In Board Remote on a PC at this hospital: Remote, Backend containers, add"
   n=0; for ip in $(hostname -I 2>/dev/null || ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null); do case "$ip" in 127.*|169.254.*|172.1[6-9].*|172.2?.*|172.3[01].*|*:*) ;; *) echo "    http://$ip:$1"; n=1;; esac; done
   [ "$n" = 1 ] || echo "    http://<this server's address>:$1"

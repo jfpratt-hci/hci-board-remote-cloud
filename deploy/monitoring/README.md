@@ -2,6 +2,8 @@
 
 A production backend that runs only its Docker services needs two things added, in this order. Neither changes the deployment's own `docker-compose.yml` or restarts its services.
 
+**Only the Board Remote PCs can reach them.** cAdvisor and Prometheus have no sign in, so each script needs `--allow <PC address>[,<PC address>]` (Windows: `-Allow`). On Linux it adds rules to Docker's `DOCKER-USER` firewall chain for that port (they last until the server restarts: run the script again after a restart, or save them with iptables-persistent); on Windows it adds a Windows Firewall rule that blocks every other address. `--open` / `-Open` skips this and leaves the port open to the whole network. Try it on the QA server first: the Windows rule has not been run on a real Docker Desktop host yet.
+
 | Step | Script (Windows / Linux) | Gives | Host port |
 |---|---|---|---|
 | 1 | `add-cadvisor.ps1` / `add-cadvisor.sh` | Containers page: CPU, memory, network, disk per container; container alerts (stopped, memory limit, CPU throttling, restart loop, unusual) | 8098 |
@@ -35,13 +37,13 @@ Only resource numbers leave the hospital: container name, image, start time, CPU
 Copy this folder to the Docker host and run, on Windows (Docker Desktop):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File add-cadvisor.ps1
+powershell -ExecutionPolicy Bypass -File add-cadvisor.ps1 -Allow 10.4.2.15
 ```
 
 or on Linux:
 
 ```bash
-sudo ./add-cadvisor.sh
+sudo ./add-cadvisor.sh --allow 10.4.2.15
 ```
 
 It finds the running compose project (for example `hci-mediacare` in `D:\hci-mediacare`), puts `docker-compose.cadvisor.yml` next to its `docker-compose.yml` without editing that file, and starts **only** the `cadvisor` service (`up -d --no-deps cadvisor`), so nothing else in the deployment restarts. Then it waits for cAdvisor to answer and prints the address to add in Board Remote.

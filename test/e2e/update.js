@@ -58,9 +58,11 @@ const getJson = (url, opts) => new Promise(resolve => {
   // "install" Board Remote 2.1.0 the way the installer lays it out
   const INSTALL = path.join(HERE, 'Program Files', 'Board Remote'), DATA = path.join(HERE, 'ProgramData', 'Board Remote');
   const src = path.join(ROOT, 'board-remote');
-  const v210 = pkgr.build({ src, out: HERE, key: privPem });
+  // the test's own version numbers (2.1.0, then 2.2.0 and 2.3.0), whatever version the source is at
+  const v210 = pkgr.build({ src, out: HERE, key: privPem, version: '2.1.0' });
   fs.mkdirSync(path.join(INSTALL, 'versions', '2.1.0'), { recursive: true });
   execSync('unzip -q ' + JSON.stringify(v210.zip) + ' -d ' + JSON.stringify(path.join(INSTALL, 'versions', '2.1.0')));
+  { const f = path.join(INSTALL, 'versions', '2.1.0', 'server.js'); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/const VERSION = '[\d.]+';/, "const VERSION = '2.1.0';")); }
   fs.mkdirSync(path.join(INSTALL, 'service'), { recursive: true });
   fs.copyFileSync(path.join(src, 'service', 'supervisor.js'), path.join(INSTALL, 'service', 'supervisor.js'));
   fs.writeFileSync(path.join(INSTALL, 'service', 'release-key.pub'), pubPem);

@@ -15,7 +15,7 @@ const SRC = path.join(ROOT, 'board-remote');
 const DIST = path.join(ROOT, 'dist');
 const SIGN_PREFIX = 'HCI-ONE-BOARD-REMOTE|';
 // what ships: the program, the dashboard, the bundled APKs, the service and its key, the docs
-const INCLUDE = ['server.js', 'audit.js', 'cloud.js', 'deploy.js', 'health.js', 'logs.js', 'remote.js', 'ws.js', 'README.txt', 'board_remote.ico',
+const INCLUDE = ['server.js', 'audit.js', 'cloud.js', 'containers.js', 'prom-rules.js', 'deploy.js', 'health.js', 'logs.js', 'remote.js', 'ws.js', 'README.txt', 'board_remote.ico',
   'public', 'service', 'apks/HCI_ONE_ADB.apk', 'apks/HCI_ONE_Room_Sign.apk', 'relay'];
 
 function version() {

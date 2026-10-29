@@ -19,6 +19,8 @@ param(
   [string]$ComposeDir = '',
   [int]$Port = 9090,
   [string]$Bind = '0.0.0.0',
+  [string]$Allow = '',
+  [switch]$Open,
   [string]$Version = 'v2.55.1',
   [switch]$Force,
   [switch]$Rescan
@@ -32,7 +34,9 @@ $Name = 'hci-prometheus'
 $Skip = @(3306, 5432, 6379, 27017, 61616, 5672, 1883, 11211, 9300)   # never HTTP metrics: databases, brokers, MQTT
 function Say($m) { Write-Host "  $m" }
 function Fail($m) { Write-Host "  $m" -ForegroundColor Red; exit 1 }
+. (Join-Path $Here 'lock-port.ps1'); Test-Allow
 function Show-Address($port) {
+  Lock-Port $port
   $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' -and $_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback' } | Select-Object -ExpandProperty IPAddress
   Write-Host "`n  In Board Remote on a PC at this hospital: Remote, Backend containers, add the host again with Prometheus address" -ForegroundColor Green
   foreach ($ip in $ips) { Write-Host "    http://${ip}:$port" -ForegroundColor Green }

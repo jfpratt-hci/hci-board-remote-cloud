@@ -2,15 +2,16 @@
 # Adds Prometheus to an existing HCI backend on a Linux Docker host, so Board Remote can run HCI's service
 # alerts (service down, error rate, slow, Java memory, database pool, Kong) against it. Run after
 # add-cadvisor.sh. Same steps as add-prometheus.ps1:
-#   sudo ./add-prometheus.sh [--dir /opt/hci-mediacare] [--port 9090] [--bind 0.0.0.0] [--version v2.55.1] [--force] [--rescan]
+#   sudo ./add-prometheus.sh [--dir /opt/hci-mediacare] [--port 9090] --allow <Board Remote PC address>[,<address>] [--bind 0.0.0.0] [--version v2.55.1] [--force] [--rescan]
 # --rescan only looks for services again and rewrites prometheus.yml (after services are added or removed).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; OVERRIDE="$HERE/docker-compose.prometheus.yml"
-DIR=""; PORT=9090; BIND=0.0.0.0; VERSION=v2.55.1; FORCE=0; RESCAN=0
+DIR=""; PORT=9090; BIND=0.0.0.0; ALLOW=""; OPEN=0; VERSION=v2.55.1; FORCE=0; RESCAN=0
 while [ $# -gt 0 ]; do case "$1" in
-  --dir) DIR="$2"; shift 2;; --port) PORT="$2"; shift 2;; --bind) BIND="$2"; shift 2;; --version) VERSION="$2"; shift 2;;
+  --dir) DIR="$2"; shift 2;; --port) PORT="$2"; shift 2;; --bind) BIND="$2"; shift 2;; --allow) ALLOW="$2"; shift 2;; --open) OPEN=1; shift;; --version) VERSION="$2"; shift 2;;
   --force) FORCE=1; shift;; --rescan) RESCAN=1; shift;; *) echo "Unknown option $1"; exit 1;; esac; done
 say() { echo "  $*"; }; fail() { echo "  $*" >&2; exit 1; }
+. "$HERE/lock-port.sh"; check_allow
 NAME=hci-prometheus
 # ports that never serve HTTP metrics: databases, brokers, MQTT
 SKIP=" 3306 5432 6379 27017 61616 5672 1883 11211 9300 "
@@ -20,6 +21,7 @@ command -v docker >/dev/null || fail "Docker is not installed."
 docker info >/dev/null 2>&1 || fail "Docker is not running, or this user cannot use it (try sudo)."
 [ -f "$OVERRIDE" ] || fail "docker-compose.prometheus.yml is missing. Keep it next to this script."
 show() {
+  lock_port "$1"
   echo; echo "  In Board Remote on a PC at this hospital: Remote, Backend containers, add the host again with Prometheus address"
   n=0; for ip in $(hostname -I 2>/dev/null || ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null); do case "$ip" in 127.*|169.254.*|172.1[6-9].*|172.2?.*|172.3[01].*|*:*) ;; *) echo "    http://$ip:$1"; n=1;; esac; done
   [ "$n" = 1 ] || echo "    http://<this server's address>:$1"

@@ -90,11 +90,9 @@ Tests: `npm test` (195: token sign in, database, sign in, agent link, concurrenc
   - from the services (when the host's Prometheus address is added in Board Remote): HCI's rules in `board-remote/prom-rules.js`, run read-only against the site's Prometheus: service down, 5xx error rate, slow responses, Java memory, garbage collection, waiting for database connections, error logs far above last week, Kong errors and Kong's database. Any alert the site's Prometheus itself fires is passed on too (name, severity and service only). Nothing on the site's Prometheus is changed.
 - **Timeline**: restarts, stops, starts and memory limit hits per container (`br.container_events`).
 - **Kept** 8 days, one sample per container per minute, in `br.container_samples` behind row level security like everything else.
-- **Adding monitoring to a deployment** that runs only its services (production today): `deploy/monitoring/`. Step 1 `add-cadvisor` (host port 8098), step 2 `add-prometheus` (9090, finds the services that publish metrics and writes its config from them). Each starts only its own container next to the existing compose project, without touching the rest. `.ps1` for Windows Docker Desktop, `.sh` for Linux. See `deploy/monitoring/README.md`.
+- **Adding monitoring to a deployment** that runs only its services (production today): `deploy/monitoring/`. Step 1 `add-cadvisor` (host port 8098), step 2 `add-prometheus` (9090), each with `--allow <Board Remote PC address>` (`-Allow` on Windows) so only those PCs can reach the port (neither has a sign in); `--open` leaves it reachable from the whole network. Step 2 ( finds the services that publish metrics and writes its config from them). Each starts only its own container next to the existing compose project, without touching the rest. `.ps1` for Windows Docker Desktop, `.sh` for Linux. See `deploy/monitoring/README.md`.
 
-- **Upgrading a database from 0.3**: migration `004_reports` never recorded itself, so run this once before deploying 0.4.0, or the migrator tries 004 again and stops on "state_log already exists":
-  `insert into br.schema_migrations (version) values ('004_reports') on conflict do nothing;`
-  From 0.4.0 the migrator records every migration it runs.
+- **Upgrading a database from 0.3**: nothing to do by hand. Since 0.3.1 the migrator records every migration it runs, and marks `004_reports` done on a database that already has its table.
 
 ## Board Remote for Windows and its updates
 

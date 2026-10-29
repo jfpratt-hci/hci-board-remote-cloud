@@ -2,7 +2,7 @@
   Adds cAdvisor (github.com/google/cadvisor) to an existing HCI backend on Windows (Docker Desktop),
   so Board Remote can show its containers in HCI ONE Cloud. Run on the Docker host, in PowerShell:
 
-    powershell -ExecutionPolicy Bypass -File add-cadvisor.ps1
+    powershell -ExecutionPolicy Bypass -File add-cadvisor.ps1 -Allow <Board Remote PC address>
     powershell -ExecutionPolicy Bypass -File add-cadvisor.ps1 -ComposeDir D:\hci-mediacare -Port 8098
 
   What it does, and nothing else:
@@ -16,6 +16,8 @@ param(
   [string]$ComposeDir = '',
   [int]$Port = 8098,
   [string]$Bind = '0.0.0.0',
+  [string]$Allow = '',
+  [switch]$Open,
   [string]$Version = '0.60.6',
   [switch]$Force
 )
@@ -26,6 +28,7 @@ $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Override = Join-Path $Here 'docker-compose.cadvisor.yml'
 function Say($m) { Write-Host "  $m" }
 function Fail($m) { Write-Host "  $m" -ForegroundColor Red; exit 1 }
+. (Join-Path $Here 'lock-port.ps1'); Test-Allow
 
 Write-Host "`nHCI ONE: add cAdvisor to this Docker host`n" -ForegroundColor Cyan
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail 'Docker is not installed or not on PATH.' }
@@ -41,6 +44,7 @@ function Wait-Cadvisor($port) {
   return $false
 }
 function Show-Address($port) {
+  Lock-Port $port
   $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' -and $_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback' } | Select-Object -ExpandProperty IPAddress
   Write-Host "`n  In Board Remote on a PC at this hospital: Remote, Backend containers, add" -ForegroundColor Green
   foreach ($ip in $ips) { Write-Host "    http://${ip}:$port" -ForegroundColor Green }
