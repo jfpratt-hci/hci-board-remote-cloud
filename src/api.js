@@ -10,7 +10,7 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clip = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
 const bad = (status, message) => Object.assign(new Error(message), { status });
 
-function create(agents, updates, reports) {
+function create(agents, updates, reports, containers) {
   const routes = [];
   const on = (method, pattern, fn) => routes.push({ method, re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[0-9a-f-]{36})') + '$'), fn });
 
@@ -184,6 +184,10 @@ function create(agents, updates, reports) {
   on('GET', '/api/dashboard', async (A, b, p, q) => reports.dashboard(A, q));
   for (const k of ['uptime', 'alerts', 'inventory', 'activity']) on('GET', '/api/reports/' + k, async (A, b, p, q) => reports.report(A, k, q));
   on('POST', '/api/alerts/:id/ack', async (A, b, p) => reports.ack(A, p.id));
+
+  /* ---------- backend containers (cAdvisor) ---------- */
+  on('GET', '/api/containers', async (A, b, p, q) => containers.view(A, q));
+  on('GET', '/api/containers/events', async (A, b, p, q) => containers.events(A, q));
 
   /* ---------- audit log ---------- */
   on('GET', '/api/hospitals/:id/audit', async (A, b, p, q) => {

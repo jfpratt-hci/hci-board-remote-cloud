@@ -20,8 +20,9 @@ const Agents = require('./agents');
 const Api = require('./api');
 const Updates = require('./updates');
 const Reports = require('./reports');
+const Containers = require('./containers');
 
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 const PUB = path.join(__dirname, '..', 'public');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 const SEC = {
@@ -41,7 +42,9 @@ function start(env) {
     sessionSecret: env.SESSION_SECRET, bootstrapAdmin: env.BR_BOOTSTRAP_ADMIN || '', devLogin: env.BR_DEV_LOGIN === '1' });
   const agents = Agents.create(log);
   const updates = Updates.create({ publicKey: env.BR_RELEASE_PUBKEY, agents });
-  const api = Api.create(agents, updates, Reports.create(agents));
+  const containers = Containers.create(agents);
+  agents.setContainers(containers);
+  const api = Api.create(agents, updates, Reports.create(agents), containers);
 
   const json = (res, code, obj) => { res.writeHead(code, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, SEC)); res.end(JSON.stringify(obj)); };
   const readBody = (req, max) => new Promise((resolve, reject) => {

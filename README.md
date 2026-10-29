@@ -1,4 +1,4 @@
-# HCI ONE Board Remote Cloud 0.2.0
+# HCI ONE Board Remote Cloud 0.4.0
 
 One web view of every hospital's boards, built from the Board Remote PCs at each site. Microsoft sign in, roles per hospital, the HCI location lock, live commands, and an audit log that cannot be edited.
 
@@ -9,6 +9,7 @@ One web view of every hospital's boards, built from the Board Remote PCs at each
 | Boards: identity (MAC or serial), room, unit, closet, type, model | yes | yes |
 | Health: state, headline, last heartbeat | yes | yes |
 | People, roles, PCs, audit log | yes | |
+| Backend containers (cAdvisor): name, image, CPU, memory, network, disk | yes | yes |
 | Screens, snapshots, screen text, device logs (can show PHI) | **never** | yes |
 
 Each PC connects **out** on 443 (WebSocket at `/agent`). Nothing is opened at the hospital.
@@ -41,7 +42,7 @@ DATABASE_URL=postgres://br_app:...@host/db PUBLIC_URL=http://localhost:8080 SESS
 
 `BR_DEV_LOGIN=1` allows `/auth/dev?email=...` from this computer only, and the server refuses to start with it on an https address.
 
-Tests: `npm test` (126: token sign in, database, sign in, agent link, concurrency, updates), `npm run e2e` (30, one cloud and two real Board Remote copies with a fake adb) and `npm run e2e:update` (23).
+Tests: `npm test` (195: token sign in, database, sign in, agent link, concurrency, updates, reports, containers), `npm run e2e` (30, one cloud and two real Board Remote copies with a fake adb) and `npm run e2e:update` (23).
 
 ## Settings
 
@@ -72,6 +73,26 @@ Tests: `npm test` (126: token sign in, database, sign in, agent link, concurrenc
 - **Where the numbers come from**: `br.state_log`, written by a database trigger whenever a board's state changes. Uptime = up / (up + offline); time nobody could watch a board (its PC offline, or paused) does not count either way. History starts when 0.3.0 goes live.
 - **Alerts**: a board going offline opens one and coming back closes it (same trigger). A PC gone more than 2 minutes opens one, closed when it reconnects. Acknowledging is in the audit log.
 - **Floor**: worked out from the room number (401 is floor 4, 1205 is floor 12), or typed on the board in the cloud. Cloud only; Board Remote PCs keep room, unit and closet.
+
+## Backend containers (0.4.0, Board Remote 2.2)
+- **Containers** page: one hospital's Docker hosts (MediaCare and its services), from [cAdvisor](https://github.com/google/cadvisor), over 1 h, 6 h, 24 h, 7 days or a custom stretch of the 8 days kept (Custom: From and To, Today, Yesterday, Last 2 days; or drag across a chart or the heatmap to zoom in). A custom stretch also sets what Sizing and headroom is worked out from:
+  - **Where the host goes**: host memory and CPU right now, cut into the containers using it.
+  - **Focus panel**: CPU, memory (with its limit), network and disk for the whole host or the one container picked; in and out mirrored about a centre line; restarts and stops marked, memory limit hits as a strip along the top.
+  - **Every container over time**: a heatmap, a row per container and a cell per minute, for CPU, memory, network, disk or CPU throttling.
+  - **Sizing and headroom**, from each container's last 7 days: memory limits too tight, missing or far too generous, with a suggested limit (30% over the peak); CPU limits that hold a container back; memory growing steadily toward its limit (or the host's memory) with the days left; filesystems that keep growing; and whether the limits add up to more than the host has.
+  - a table of every container with its image, state and uptime: All, Needs a look or Stopped, sorted by any column.
+  - **Recent events** in the stretch shown, paged by the server (`GET /api/containers/events`, 25 rows a page, newest first, by cursor): the same container and kind again within 10 minutes is one row with a count, filtered by kind or by the container looked at. The charts' markers get the events counted per minute instead.
+  - Long lists (problems, containers, the heatmap, sizing) show a page at a time with Show more, and problems narrow by kind.
+- **How it gets here**: the Board Remote PC at the hospital reads cAdvisor on the LAN once a minute (Remote, Backend containers, add `http://<host>:8098`) and sends the numbers up its link. The cloud never connects into the hospital. Labels, environment, processes and logs are never read.
+- **Alerts**, each closing on its own once the cause is gone:
+  - from cAdvisor: a container stopped; cAdvisor not answering for 3 minutes; at 90% of its memory limit for 5 minutes, or it hit the limit; held back by its CPU limit a quarter of the time for 10 minutes; restarted twice in 30 minutes;
+  - unusual for this time of day, against its own history of at least 3 earlier days: much more memory or CPU than usual, or network traffic stopping;
+  - from the services (when the host's Prometheus address is added in Board Remote): HCI's rules in `board-remote/prom-rules.js`, run read-only against the site's Prometheus: service down, 5xx error rate, slow responses, Java memory, garbage collection, waiting for database connections, error logs far above last week, Kong errors and Kong's database. Any alert the site's Prometheus itself fires is passed on too (name, severity and service only). Nothing on the site's Prometheus is changed.
+- **Timeline**: restarts, stops, starts and memory limit hits per container (`br.container_events`).
+- **Kept** 8 days, one sample per container per minute, in `br.container_samples` behind row level security like everything else.
+- **Adding monitoring to a deployment** that runs only its services (production today): `deploy/monitoring/`. Step 1 `add-cadvisor` (host port 8098), step 2 `add-prometheus` (9090), each with `--allow <Board Remote PC address>` (`-Allow` on Windows) so only those PCs can reach the port (neither has a sign in); `--open` leaves it reachable from the whole network. Step 2 ( finds the services that publish metrics and writes its config from them). Each starts only its own container next to the existing compose project, without touching the rest. `.ps1` for Windows Docker Desktop, `.sh` for Linux. See `deploy/monitoring/README.md`.
+
+- **Upgrading a database from 0.3**: nothing to do by hand. Since 0.3.1 the migrator records every migration it runs, and marks `004_reports` done on a database that already has its table.
 
 ## Board Remote for Windows and its updates
 

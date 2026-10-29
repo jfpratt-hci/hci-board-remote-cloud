@@ -87,3 +87,5 @@ grant execute on function br.floor_of(text, text) to br_app;
 create function br.hci_user(u uuid) returns boolean language sql stable security definer set search_path = br, pg_catalog as $$
   select coalesce((select is_hci from br.users where id = u), false) $$;
 grant execute on function br.hci_user(uuid) to br_app;
+
+insert into br.schema_migrations (version) values ('004_reports') on conflict do nothing;
