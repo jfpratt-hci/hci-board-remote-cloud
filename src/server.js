@@ -21,7 +21,7 @@ const Api = require('./api');
 const Updates = require('./updates');
 const Reports = require('./reports');
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 const PUB = path.join(__dirname, '..', 'public');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 const SEC = {

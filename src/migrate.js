@@ -19,8 +19,16 @@ async function migrate(url, log, identity) {
     for (const f of files) {
       const v = f.replace(/\.sql$/, '');
       if (have.has(v)) continue;
+      // 004_reports shipped without recording itself: a database that already has its table is marked done, not run again
+      if (v === '004_reports' && (await c.query("select to_regclass('br.state_log') as t")).rows[0].t) {
+        await c.query('insert into br.schema_migrations (version) values ($1) on conflict do nothing', [v]); log('recorded ' + v + ' (already applied)'); continue;
+      }
       await c.query('begin');
-      try { await c.query(fs.readFileSync(path.join(dir, f), 'utf8')); await c.query('commit'); n++; log('applied ' + v); }
+      try {
+        await c.query(fs.readFileSync(path.join(dir, f), 'utf8'));
+        await c.query('insert into br.schema_migrations (version) values ($1) on conflict do nothing', [v]);   // every file is recorded, whether or not it records itself
+        await c.query('commit'); n++; log('applied ' + v);
+      }
       catch (e) { await c.query('rollback'); throw new Error(v + ': ' + e.message); }
     }
     if (!n) log('database is up to date');
