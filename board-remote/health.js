@@ -25,6 +25,18 @@ module.exports = function createHealth(ctx) {
   const FILE = path.join(ROOT, 'health.json');
   const KEEPER_PKG = 'com.hci.one.adb';
   const KEEPER_APK = path.join(APP, 'apks', 'HCI_ONE_ADB.apk');
+  // Keeper 1.1 (versionCode 2) keeps whichever port it is told: 5555 for boards, 65037 for cameras.
+  // Keeper 1.0 always forces 5555, which would break a camera, so it never goes on one.
+  const KEEPER_PORTS_SINCE = 2;
+  function keeperFor(port) {
+    if (!fs.existsSync(KEEPER_APK)) return { ok: false, why: 'No keeper APK in the apks folder.' };
+    if (port !== ctx.CAMERA_PORT) return { ok: true };
+    const info = ctx.apkInfo ? ctx.apkInfo(KEEPER_APK) : null;
+    const vc = info && Number(info.versionCode) || 0;
+    return vc >= KEEPER_PORTS_SINCE ? { ok: true }
+      : { ok: false, why: 'The keeper in the apks folder is ' + (info && info.versionName ? info.versionName : 'an old version') + ', which only keeps 5555 and would break a camera. Put HCI ONE ADB 1.1 or newer in the apks folder.' };
+  }
+  const keeperStart = port => 'am start -n ' + KEEPER_PKG + '/.MainActivity --ei port ' + (port || 5555);
   const startedAt = Date.now();
   const KINDS = { wb: 'Whiteboard', ds: 'Door sign', tv: 'Patient TV', cam: 'Camera', tab: 'Tablet', usb: 'Unit Status Board', other: 'Device' };
   const DEFAULTS = {
@@ -429,7 +441,7 @@ module.exports = function createHealth(ctx) {
     else rows.push(['pass', 'Link', 'Network link up.', '']);
     const ip = (f.ifaces || [])[0];
     rows.push(['pass', 'Network', 'Answers this PC in ' + (h.connectMs === null ? '?' : h.connectMs) + ' ms' + (ip ? ' · ' + ip.name + ' ' + ip.ip : '') + '.', b.host]);
-    rows.push(['pass', 'Network ADB', 'Answering on ' + b.port + ' and approved for this PC.' + (b.port === ctx.CAMERA_PORT ? ' Camera port, no keeper needed.' : h.keeper ? ' ADB keeper installed.' : h.keeper === false ? ' No ADB keeper on this board.' : ''), 'port ' + b.port]);
+    rows.push(['pass', 'Network ADB', 'Answering on ' + b.port + ' and approved for this PC.' + (h.keeper ? ' ADB keeper installed.' : h.keeper === false ? ' No ADB keeper on this ' + (b.port === ctx.CAMERA_PORT ? 'camera.' : 'board.') : ''), 'port ' + b.port]);
     rows.push(has('clock') ? ['fail', 'Clock', 'The clock is ' + skewText(f.skew) + '. Sign ins can be refused.', (f.skew > 0 ? '+' : '') + Math.round(f.skew) + ' s'] : ['pass', 'Clock', 'Within ' + Math.max(1, Math.round(Math.abs(f.skew || 0))) + ' s of this PC.', '']);
     if (!c.serverHost) rows.push(['skip', 'HCI ONE server', 'Not set up. Add the server address in Settings to test it from every board.', '']);
     else rows.push(has('server') ? ['warn', 'HCI ONE server', 'The board cannot reach ' + c.serverHost + '.', 'no reply'] : ['pass', 'HCI ONE server', 'The board reaches ' + c.serverHost + ' in ' + f.serverMs + ' ms.', f.serverMs + ' ms']);
@@ -590,7 +602,7 @@ module.exports = function createHealth(ctx) {
     const h = H(b), r = R(b);
     const fresh = h.lastBeat >= startedAt && now() - h.lastBeat < LATE && r.status === 'online';
     const list = ['restart', 'reboot', 'wake', 'clock', 'storage', 'reconnect'];
-    if (fs.existsSync(KEEPER_APK) && h.keeper !== true && b.port !== ctx.CAMERA_PORT) list.push('keeper');   // cameras keep 65037 on their own
+    if (h.keeper !== true && keeperFor(b.port).ok) list.push('keeper');
     return list.map(a => {
       let block = '';
       if (h.busy) block = 'A command is already running on this board.';
@@ -668,15 +680,16 @@ module.exports = function createHealth(ctx) {
           ok = await probeBoard(b);
           fin = ok ? 'ADB link is back and the board answered its heartbeat.' : 'ADB did not come back. ' + (h.reach === 'refused' ? 'Network ADB is off on the board.' : 'The board is not answering.');
         } else if (act === 'keeper') {
-          const res = await cmd(b, h, ['install', '-r', KEEPER_APK], 180000);
+          const kf = keeperFor(b.port);
+          const res = kf.ok ? await cmd(b, h, ['install', '-r', KEEPER_APK], 180000) : { out: '', err: kf.why };
           if (/Success/.test(String(res.out) + res.err)) {
-            await cmd(b, h, ['shell', 'am start -n ' + KEEPER_PKG + '/.MainActivity']);
+            await cmd(b, h, ['shell', keeperStart(b.port)]);
             await sleep(1500);
             await cmd(b, h, ['shell', 'input keyevent 4']);
             h.keeperAt = 0; await probeBoard(b);
             ok = h.keeper === true;
             fin = ok ? 'HCI ONE ADB keeper installed and started. Network ADB now stays on through reboots (root or the factory setting is still needed on some boards).' : 'Installed, but the keeper did not show up. Open HCI ONE ADB on the board once.';
-          } else fin = 'Install failed. ' + ((/Failure.*$/m.exec(String(res.out) + res.err) || [''])[0]);
+          } else fin = kf.ok ? 'Install failed. ' + ((/Failure.*$/m.exec(String(res.out) + res.err) || [''])[0]) : kf.why;
         } else if (act === 'reboot') {
           if (ctx.stopLive) ctx.stopLive(b.id, 'Rebooting');
           await cmd(b, h, ['reboot']);
@@ -893,21 +906,24 @@ module.exports = function createHealth(ctx) {
         e.mac = e.mac || (v[5] || v[4] || '').toUpperCase();
         step('identify', 'done', [e.make, e.model].filter(Boolean).join(' ') + (e.serialNo ? ', serial ' + e.serialNo : '') + (e.android ? ', Android ' + e.android : '') + (e.mac ? ', MAC ' + e.mac : '') + '.');
         cur = 'keep'; step('keep', 'now');
-        if (port === ctx.CAMERA_PORT) step('keep', 'done', 'Camera on port ' + port + '. It keeps its own network ADB, so no keeper is installed.');
-        else {
+        const cam = port === ctx.CAMERA_PORT, kf = keeperFor(port);
         const has = /package:/.test(String((await adb(['-s', serial, 'shell', 'pm path ' + KEEPER_PKG], { timeout: 8000 })).out || ''));
-        if (has) step('keep', 'done', 'HCI ONE ADB keeper is already on this board.');
+        if (has) {
+          // tell the keeper which port to hold (1.0 ignores this, 1.1 saves it)
+          await adb(['-s', serial, 'shell', keeperStart(port)], { timeout: 8000 });
+          await sleep(1200); await adb(['-s', serial, 'shell', 'input keyevent 4'], { timeout: 6000 });
+          step('keep', 'done', 'HCI ONE ADB keeper is already on this ' + (cam ? 'camera' : 'board') + ', keeping port ' + port + '.');
+        } else if (cam && !kf.ok) step('keep', 'warn', kf.why + ' The camera keeps 65037 until then, but may lose it after a reboot.');
         else if (fs.existsSync(KEEPER_APK)) {
           const ir = await adb(['-s', serial, 'install', '-r', KEEPER_APK], { timeout: 180000 });
           if (/Success/.test(String(ir.out) + ir.err)) {
-            await adb(['-s', serial, 'shell', 'am start -n ' + KEEPER_PKG + '/.MainActivity'], { timeout: 8000 });
+            await adb(['-s', serial, 'shell', keeperStart(port)], { timeout: 8000 });
             await sleep(1200); await adb(['-s', serial, 'shell', 'input keyevent 4'], { timeout: 6000 });
-            step('keep', 'done', 'Installed and started the HCI ONE ADB keeper.');
+            step('keep', 'done', 'Installed and started the HCI ONE ADB keeper on port ' + port + '.');
           } else step('keep', 'warn', 'Could not install the ADB keeper. ' + ((/Failure.*$/m.exec(String(ir.out) + ir.err) || [''])[0]));
         } else {
-          const sr = await adb(['-s', serial, 'shell', 'su -c "setprop persist.adb.tcp.port 5555" 2>&1'], { timeout: 8000 });
-          step('keep', /not found|denied|permission/i.test(String(sr.out) + sr.err) ? 'warn' : 'done', /not found|denied|permission/i.test(String(sr.out) + sr.err) ? 'No keeper APK in the apks folder and no root. Network ADB may turn off after a reboot.' : 'Set persist.adb.tcp.port to 5555.');
-        }
+          const sr = await adb(['-s', serial, 'shell', 'su -c "setprop persist.adb.tcp.port ' + port + '" 2>&1'], { timeout: 8000 });
+          step('keep', /not found|denied|permission/i.test(String(sr.out) + sr.err) ? 'warn' : 'done', /not found|denied|permission/i.test(String(sr.out) + sr.err) ? 'No keeper APK in the apks folder and no root. Network ADB may turn off after a reboot.' : 'Set persist.adb.tcp.port to ' + port + '.');
         }
         cur = 'clock'; step('clock', 'now');
         const t1 = now();

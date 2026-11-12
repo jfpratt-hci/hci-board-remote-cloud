@@ -875,7 +875,7 @@ function renderNew() {
     ['Look on the network', 'Every few minutes Board Remote checks this PC’s networks for anything answering ADB on port 5555, then checks camera port 65037 on every address that did not answer. A board on USB, or one another tool already connected, shows up right away.'],
     ['Ask the person at the board', 'Claiming connects to it. The board shows Allow USB debugging with this PC’s fingerprint. Nothing happens until someone there taps Allow.'],
     ['Learn who it is', 'Model, serial, Android version and MAC come from the board itself.'],
-    ['Set it up', 'Board Remote installs the HCI ONE ADB keeper so network ADB survives reboots (cameras keep 65037 on their own and are left alone), checks the clock and notes the app on screen.'],
+    ['Set it up', 'Board Remote installs the HCI ONE ADB keeper so network ADB survives reboots (on port 65037 for cameras, 5555 for everything else), checks the clock and notes the app on screen.'],
     ['Watch it', 'It joins the heartbeat wall in its room and closet, or takes over the record of the board it replaces.']
   ].map(function (s, i) { return '<div class="rule"><span class="ri">' + (i + 1) + '</span><span class="if">' + s[0] + '</span><span class="then">' + s[1] + '</span></div>'; }).join(''));
   html('itList', [

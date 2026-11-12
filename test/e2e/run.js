@@ -173,6 +173,21 @@ const req = (base, method, p, body, headers) => new Promise((resolve, reject) =>
   T('the same camera cannot be added twice on 65037', camDupe && !camDupe.ok, camDupe);
   const wbStill = (await boardsOf(B)).filter(x => x.host === '127.0.0.2' || x.host === '127.0.0.3');
   T('boards on 5555 stay on 5555', wbStill.length === 2 && wbStill.every(x => x.port === 5555), wbStill.map(x => x.port));
+  // the keeper: 1.0 only knows 5555, so it is never offered to a camera; 1.1 is, and is told to hold 65037
+  const camActs = async () => { const st = (await L(B, 'GET', '/api/health?sel=' + camB.id)).json; const x = st.boards.find(y => y.id === camB.id); return (x.health.actions || []).map(a => a.key); };
+  const wbId = wbStill[0].id, wbActs = (((await L(B, 'GET', '/api/health?sel=' + wbId)).json.boards.find(y => y.id === wbId).health.actions) || []).map(a => a.key);
+  const acts10 = await camActs();
+  T('with keeper 1.0 in the folder, a board is offered the keeper and a camera is not', wbActs.indexOf('keeper') >= 0 && acts10.indexOf('keeper') < 0, [wbActs, acts10]);
+  const refuse = (await L(B, 'POST', '/api/health/' + camB.id + '/act', { act: 'keeper' })).json;
+  T('and installing keeper 1.0 on a camera is refused', refuse && !/install/i.test(fs.readFileSync(path.join(HERE, 'stB', 'calls.log'), 'utf8').split('\n').filter(l => l.indexOf('127.0.0.6') >= 0).join('\n')), refuse);
+  if (process.env.KEEPER11) {
+    fs.copyFileSync(process.env.KEEPER11, path.join(HERE, 'pcB', 'apks', 'HCI_ONE_ADB.apk'));
+    const acts11 = await camActs();
+    T('with keeper 1.1 in the folder, the camera is offered the keeper', acts11.indexOf('keeper') >= 0, acts11);
+    await L(B, 'POST', '/api/health/' + camB.id + '/act', { act: 'keeper' });
+    const calls = await until(() => { const c = fs.readFileSync(path.join(HERE, 'stB', 'calls.log'), 'utf8'); return /127\.0\.0\.6:65037 shell am start -n com\.hci\.one\.adb\/\.MainActivity --ei port 65037/.test(c) ? c : null; }, 20000);
+    T('the keeper goes on the camera and is told to hold port 65037', !!calls);
+  }
 
   B.proc.kill();
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

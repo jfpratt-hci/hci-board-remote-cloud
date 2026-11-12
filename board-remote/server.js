@@ -16,7 +16,7 @@ const net = require('net');
 const crypto = require('crypto');
 const { execFile, spawn } = require('child_process');
 
-const VERSION = '2.1.1';
+const VERSION = '2.1.2';
 /* APP holds the program (replaced by updates); ROOT holds this PC's data (boards, health, audit,
    snapshots, tools). They are the same folder unless the Windows service sets BR_DATA_DIR. */
 const APP = __dirname;
@@ -1215,7 +1215,8 @@ const server = http.createServer(async (req, res) => {
 loadStore();
 health = require('./health')({
   store, saveStore, R, serialOf, adb, shell, log, ROOT, APP, IS_WIN, send, readJson, publicBoard, normBoard,
-  connect, listDevices, scanHosts, scanAdb, usbNetPort, ADB_PORTS, CAMERA_PORT, isUsbSerial, stopLive
+  connect, listDevices, scanHosts, scanAdb, usbNetPort, ADB_PORTS, CAMERA_PORT, isUsbSerial, stopLive,
+  apkInfo: f => { try { return deploy ? deploy.readApk(f) : null; } catch (e) { return null; } }
 });
 deploy = require('./deploy')({ store, saveStore, R, serialOf, adb, shell, log, ROOT, APP, send, readJson, normBoard, connect, resetInfo, health });
 logs = require('./logs')({ store, saveStore, R, serialOf, adb, log, ROOT, send, readJson });

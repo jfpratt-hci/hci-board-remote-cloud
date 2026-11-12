@@ -182,7 +182,7 @@ a{color:var(--blue)}
       <thead><tr><th>Setting</th><th>Why it matters</th></tr></thead>
       <tbody>
         <tr><td>USB debugging on, in Developer options</td><td>Lets the PC connect at all</td></tr>
-        <tr><td>Network ADB on port 5555</td><td>Lets the PC connect without a cable. USB to WiFi turns it on from a USB connection. Cameras only work on port 65037; Board Remote finds them there and never moves them to 5555.</td></tr>
+        <tr><td>Network ADB on port 5555</td><td>Lets the PC connect without a cable. USB to WiFi turns it on from a USB connection. Cameras only work on port 65037; Board Remote finds them there, never moves them to 5555, and installs the keeper set to hold 65037.</td></tr>
         <tr><td>Allow tapped once for this PC, with Always allow ticked</td><td>The board trusts this PC's key from then on</td></tr>
         <tr><td>HCI ONE ADB keeper installed</td><td>Keeps network ADB on after a reboot. Some boards also need root or the factory setting.</td></tr>
         <tr><td>A DHCP reservation</td><td>The board keeps its IP, so the Boards list stays right</td></tr>
@@ -241,7 +241,7 @@ a{color:var(--blue)}
         <text x="40" y="256" font-size="13" font-weight="700" fill="#1E1C19">HCI devices on the hospital network</text>
         <text x="40" y="272" fill="#7A766F">Whiteboards, door signs, patient TVs,</text>
         <text x="40" y="288" fill="#7A766F">Unit Status Boards, cameras and tablets</text>
-        <text x="40" y="304" fill="#7A766F">The HCI ONE ADB keeper keeps port 5555 open</text>
+        <text x="40" y="304" fill="#7A766F">The HCI ONE ADB keeper keeps 5555 open (65037 on cameras)</text>
         <rect x="460" y="80" width="276" height="72" rx="8" fill="none" stroke="#A8A39A" stroke-width="1.25"/>
         <text x="476" y="104" font-size="13" font-weight="700" fill="#1E1C19">Microsoft Teams</text>
         <text x="476" y="120" fill="#7A766F">Alerts to HCI Support and</text>

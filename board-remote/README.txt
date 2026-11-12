@@ -116,8 +116,9 @@ ON EACH BOARD
 USB debugging on and network ADB on 5555. Cameras only work on 65037; every
 scan tries 5555 first, then 65037 for addresses that did not answer, and a
 board saved on 5555 that stops answering is retried on 65037 and moved there.
-Cameras keep 65037 on their own, so they never get the keeper.
-For boards, install the HCI ONE ADB keeper so
+Install the HCI ONE ADB keeper on everything, cameras included: keeper 1.1
+holds 65037 on cameras and 5555 on everything else. Board Remote will not put
+keeper 1.0 on a camera, because 1.0 only knows 5555. The keeper exists so
 network ADB survives reboots: it is already in the Deploy app library (push
 it to every board), and a claim installs it too. Use DHCP reservations.
 
