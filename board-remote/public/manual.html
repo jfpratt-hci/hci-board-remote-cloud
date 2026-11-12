@@ -173,7 +173,7 @@ a{color:var(--blue)}
     <h4>The PC</h4>
     <ul>
       <li>Windows 10 or 11. No admin rights are needed.</li>
-      <li>On the same network as the boards, or with a route to them on TCP port 5555.</li>
+      <li>On the same network as the boards, or with a route to them on TCP port 5555 (and 65037 for cameras).</li>
       <li>Internet once, during SETUP, to download Node and adb. With no internet, run SETUP.bat on another PC and copy the whole folder across, tools folder included.</li>
       <li>Microsoft Edge opens the dashboard as its own window. Any browser works at http://localhost:7755 on that PC, and only that PC can open it.</li>
     </ul>
@@ -182,7 +182,7 @@ a{color:var(--blue)}
       <thead><tr><th>Setting</th><th>Why it matters</th></tr></thead>
       <tbody>
         <tr><td>USB debugging on, in Developer options</td><td>Lets the PC connect at all</td></tr>
-        <tr><td>Network ADB on port 5555</td><td>Lets the PC connect without a cable. USB to WiFi turns it on from a USB connection.</td></tr>
+        <tr><td>Network ADB on port 5555</td><td>Lets the PC connect without a cable. USB to WiFi turns it on from a USB connection. Cameras only work on port 65037; Board Remote finds them there and never moves them to 5555.</td></tr>
         <tr><td>Allow tapped once for this PC, with Always allow ticked</td><td>The board trusts this PC's key from then on</td></tr>
         <tr><td>HCI ONE ADB keeper installed</td><td>Keeps network ADB on after a reboot. Some boards also need root or the factory setting.</td></tr>
         <tr><td>A DHCP reservation</td><td>The board keeps its IP, so the Boards list stays right</td></tr>
@@ -213,7 +213,7 @@ a{color:var(--blue)}
     <h4>What Hospital IT sets up once</h4>
     <ul>
       <li>A DHCP reservation for each board, so a board never moves to a new address.</li>
-      <li>Port 5555 open from the Board Remote PC to the device network. Nothing else needs it.</li>
+      <li>Ports 5555 and 65037 (cameras) open from the Board Remote PC to the device network. Nothing else needs them.</li>
       <li>A time server the boards can reach (NTP, UDP 123). Without it clocks drift and sign ins fail.</li>
     </ul>
     <h4>How it fits together</h4>
@@ -230,7 +230,7 @@ a{color:var(--blue)}
           <path d="M432 292H460" marker-end="url(#fit-arrow)"/>
           <path d="M404 310H460" stroke-dasharray="4 4" marker-end="url(#fit-arrow)"/>
         </g>
-        <text x="226" y="196" font-size="11.5" fill="#7A766F">ADB on TCP port 5555</text>
+        <text x="226" y="196" font-size="11.5" fill="#7A766F">ADB on TCP 5555 · cameras 65037</text>
         <text x="226" y="212" font-size="11.5" fill="#7A766F">heartbeat, screens, installs, fixes</text>
         <rect x="24" y="80" width="380" height="88" rx="8" fill="#E3EBFD" stroke="#2563EB" stroke-width="2"/>
         <text x="40" y="104" font-size="13" font-weight="700" fill="#1E1C19">Board Remote PC (Windows)</text>
@@ -295,7 +295,7 @@ a{color:var(--blue)}
       <tbody>
         <tr><td>Room or IP, and Show</td><td>Appear once a site has 12 boards. Type a room, name or IP to find a board, or show one unit, one type, or only the boards that need a look. On a big site the other buttons show as icons.</td></tr>
         <tr><td>Import rooms</td><td>Opens the room list import in Deploy (<a href="#import">Appendix F</a>)</td></tr>
-        <tr><td>Find boards</td><td>Looks across this PC's network for anything with ADB open on 5555 and adds it in one click</td></tr>
+        <tr><td>Find boards</td><td>Looks across this PC's network for anything with ADB open on 5555, then on 65037 for addresses that did not answer, and adds it in one click (65037 devices come in as cameras)</td></tr>
         <tr><td>USB to WiFi</td><td>For a board plugged into this PC by USB: turns on network ADB and adds it. Then unplug the cable.</td></tr>
         <tr><td>Add board</td><td>Adds one board by IP, with its type, room, unit and closet</td></tr>
         <tr><td>Connect all</td><td>Reconnects every board, including any you disconnected</td></tr>
@@ -320,7 +320,7 @@ a{color:var(--blue)}
         <tr><td>Connecting</td><td>Board Remote is reaching the board</td><td>Wait a few seconds</td></tr>
         <tr><td>Approve on board</td><td>The board is waiting for Allow</td><td>At the board tap Allow, with Always allow from this computer ticked</td></tr>
         <tr><td>Not responding</td><td>ADB sees the board but it does not answer</td><td>Board Remote reconnects it on its own after three tries</td></tr>
-        <tr><td>Not reachable</td><td>Nothing answers on port 5555</td><td>Power, cable, switch port, or network ADB is off. Device health shows which.</td></tr>
+        <tr><td>Not reachable</td><td>Nothing answers on port 5555 or 65037</td><td>Power, cable, switch port, or network ADB is off. Device health shows which.</td></tr>
         <tr><td>Disconnected</td><td>You disconnected it</td><td>Click Connect</td></tr>
         <tr><td>Not connected</td><td>Keep connected is off for this board</td><td>Click Connect, or turn Keep connected on in Rename</td></tr>
       </tbody>
@@ -398,7 +398,7 @@ a{color:var(--blue)}
     <p>New devices lists anything that could be a board but is not on the list yet, and claims it in two taps: one here, one at the board. A device drops off the list as soon as it becomes a board, whether you claim it here or just add its IP on the Boards page.</p>
     <p>A device shows up when it:</p>
     <ul>
-      <li>answers ADB on port 5555 during a network sweep (Find devices now, or every few minutes as set in Settings),</li>
+      <li>answers ADB on port 5555 (or 65037 for a camera) during a network sweep (Find devices now, or every few minutes as set in Settings),</li>
       <li>is plugged into this PC by USB, or</li>
       <li>is already connected to adb on this PC but not on the Boards list.</li>
     </ul>
@@ -560,7 +560,7 @@ a{color:var(--blue)}
         <tr><td>The app crashes 3 times in 10 minutes</td><td>HCI Support, right away</td></tr>
         <tr><td>Clock off, app not running or behind, crash dialog, screen asleep, storage under 5%</td><td>HCI Support, after 2 checks in a row (about 1 minute)</td></tr>
         <tr><td>The problem clears</td><td>An all clear to everyone who was told</td></tr>
-        <tr><td>A new device answers on port 5555</td><td>HCI Support. It waits in New devices until someone claims it.</td></tr>
+        <tr><td>A new device answers on port 5555 or 65037</td><td>HCI Support. It waits in New devices until someone claims it.</td></tr>
       </tbody>
     </table>
 

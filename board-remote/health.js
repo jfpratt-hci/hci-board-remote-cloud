@@ -429,7 +429,7 @@ module.exports = function createHealth(ctx) {
     else rows.push(['pass', 'Link', 'Network link up.', '']);
     const ip = (f.ifaces || [])[0];
     rows.push(['pass', 'Network', 'Answers this PC in ' + (h.connectMs === null ? '?' : h.connectMs) + ' ms' + (ip ? ' · ' + ip.name + ' ' + ip.ip : '') + '.', b.host]);
-    rows.push(['pass', 'Network ADB', 'Answering on ' + b.port + ' and approved for this PC.' + (h.keeper ? ' ADB keeper installed.' : h.keeper === false ? ' No ADB keeper on this board.' : ''), 'port ' + b.port]);
+    rows.push(['pass', 'Network ADB', 'Answering on ' + b.port + ' and approved for this PC.' + (b.port === ctx.CAMERA_PORT ? ' Camera port, no keeper needed.' : h.keeper ? ' ADB keeper installed.' : h.keeper === false ? ' No ADB keeper on this board.' : ''), 'port ' + b.port]);
     rows.push(has('clock') ? ['fail', 'Clock', 'The clock is ' + skewText(f.skew) + '. Sign ins can be refused.', (f.skew > 0 ? '+' : '') + Math.round(f.skew) + ' s'] : ['pass', 'Clock', 'Within ' + Math.max(1, Math.round(Math.abs(f.skew || 0))) + ' s of this PC.', '']);
     if (!c.serverHost) rows.push(['skip', 'HCI ONE server', 'Not set up. Add the server address in Settings to test it from every board.', '']);
     else rows.push(has('server') ? ['warn', 'HCI ONE server', 'The board cannot reach ' + c.serverHost + '.', 'no reply'] : ['pass', 'HCI ONE server', 'The board reaches ' + c.serverHost + ' in ' + f.serverMs + ' ms.', f.serverMs + ' ms']);
@@ -590,7 +590,7 @@ module.exports = function createHealth(ctx) {
     const h = H(b), r = R(b);
     const fresh = h.lastBeat >= startedAt && now() - h.lastBeat < LATE && r.status === 'online';
     const list = ['restart', 'reboot', 'wake', 'clock', 'storage', 'reconnect'];
-    if (fs.existsSync(KEEPER_APK) && h.keeper !== true) list.push('keeper');
+    if (fs.existsSync(KEEPER_APK) && h.keeper !== true && b.port !== ctx.CAMERA_PORT) list.push('keeper');   // cameras keep 65037 on their own
     return list.map(a => {
       let block = '';
       if (h.busy) block = 'A command is already running on this board.';
@@ -736,7 +736,13 @@ module.exports = function createHealth(ctx) {
 
   /* ---------------- discovery and claim ---------------- */
   const fidFor = key => crypto.createHash('sha1').update(key).digest('hex').slice(0, 8);
-  function knownHost(host, port) { return store.boards.some(b => b.host === host && b.port === (port || 5555)); }
+  // A host is known on its own port, or on any ADB port (5555 or the camera port 65037), so a
+  // camera saved on 65037 never shows up again as new because it also answers on 5555.
+  const ADB_PORTS = ctx.ADB_PORTS || [5555, 65037];
+  function knownHost(host, port) {
+    port = port || 5555;
+    return store.boards.some(b => b.host === host && (b.port === port || (ADB_PORTS.indexOf(b.port) >= 0 && ADB_PORTS.indexOf(port) >= 0)));
+  }
   // A device waiting to be claimed drops off New devices the moment a board with its
   // address (or, over USB, its serial) exists, however that board was added: claimed
   // here, typed in by IP on Boards, or brought in by a room list import.
@@ -777,17 +783,20 @@ module.exports = function createHealth(ctx) {
     if (sweeping) return { ok: false, message: 'A sweep is already running.' };
     sweeping = true;
     try {
-      const hosts = await ctx.scanHosts(5555);
-      const arp = hosts.length ? await arpTable() : {};
+      // 5555 first; addresses that miss get a second look on the camera port 65037
+      const hits = ctx.scanAdb ? await ctx.scanAdb() : (await ctx.scanHosts(5555)).map(host => ({ host, port: 5555 }));
+      const arp = hits.length ? await arpTable() : {};
       let n = 0;
-      for (const host of hosts) {
-        if (knownHost(host, 5555)) continue;
-        const e = found.get(fidFor(host + ':5555'));
+      for (const { host, port } of hits) {
+        if (knownHost(host, port)) continue;
+        const e = found.get(fidFor(host + ':' + port));
         if (e && (e.status === 'ignored' || e.status === 'claimed')) { e.lastSeen = now(); continue; }
-        addFound({ key: host + ':5555', host, port: 5555, via: 'network', mac: arp[host] || '' }); n++;
+        addFound({ key: host + ':' + port, host, port, via: 'network', camera: port === ctx.CAMERA_PORT, mac: arp[host] || '' }); n++;
       }
       lastSweep = now();
-      return { ok: true, message: hosts.length ? 'Sweep done. ' + hosts.length + ' device' + (hosts.length > 1 ? 's' : '') + ' answered on 5555' + (n ? ', ' + n + ' new.' : ', nothing new.') : 'Sweep done. Nothing new answered on 5555.' };
+      const cams = hits.filter(x => x.port !== 5555).length;
+      const said = (hits.length - cams) + ' on 5555' + (cams ? ', ' + cams + ' camera' + (cams > 1 ? 's' : '') + ' on 65037' : '');
+      return { ok: true, message: hits.length ? 'Sweep done. ' + said + (n ? ', ' + n + ' new.' : ', nothing new.') : 'Sweep done. Nothing new answered on 5555 or 65037.' };
     } finally { sweeping = false; }
   }
   function onDevices(devs) {
@@ -855,9 +864,9 @@ module.exports = function createHealth(ctx) {
             if (m2 && m2[1] !== 'lo' && !/^169\.254\./.test(m2[2])) ips.push(m2[2]);
           }
           if (!ips.length) throw new Error('The board has no network address. Connect it to the network first.');
-          host = ips[0]; port = 5555;
-          await adb(['-s', e.serial, 'tcpip', '5555'], { timeout: 12000 });
-          await sleep(2500);
+          host = ips[0];
+          port = ctx.usbNetPort ? await ctx.usbNetPort(e.serial, host) : 5555;   // a camera already on 65037 stays there
+          if (!ctx.usbNetPort) { await adb(['-s', e.serial, 'tcpip', '5555'], { timeout: 12000 }); await sleep(2500); }
           e.host = host; e.port = port;
         }
         const serial = host + ':' + port;
@@ -884,6 +893,8 @@ module.exports = function createHealth(ctx) {
         e.mac = e.mac || (v[5] || v[4] || '').toUpperCase();
         step('identify', 'done', [e.make, e.model].filter(Boolean).join(' ') + (e.serialNo ? ', serial ' + e.serialNo : '') + (e.android ? ', Android ' + e.android : '') + (e.mac ? ', MAC ' + e.mac : '') + '.');
         cur = 'keep'; step('keep', 'now');
+        if (port === ctx.CAMERA_PORT) step('keep', 'done', 'Camera on port ' + port + '. It keeps its own network ADB, so no keeper is installed.');
+        else {
         const has = /package:/.test(String((await adb(['-s', serial, 'shell', 'pm path ' + KEEPER_PKG], { timeout: 8000 })).out || ''));
         if (has) step('keep', 'done', 'HCI ONE ADB keeper is already on this board.');
         else if (fs.existsSync(KEEPER_APK)) {
@@ -896,6 +907,7 @@ module.exports = function createHealth(ctx) {
         } else {
           const sr = await adb(['-s', serial, 'shell', 'su -c "setprop persist.adb.tcp.port 5555" 2>&1'], { timeout: 8000 });
           step('keep', /not found|denied|permission/i.test(String(sr.out) + sr.err) ? 'warn' : 'done', /not found|denied|permission/i.test(String(sr.out) + sr.err) ? 'No keeper APK in the apks folder and no root. Network ADB may turn off after a reboot.' : 'Set persist.adb.tcp.port to 5555.');
+        }
         }
         cur = 'clock'; step('clock', 'now');
         const t1 = now();
@@ -1051,7 +1063,7 @@ module.exports = function createHealth(ctx) {
       ['alert', 'App crashes 3 times in 10 min', 'HCI Support right away.'],
       ['board', 'Clock off by ' + c.clockDriftSeconds + ' s, app not running or behind, crash dialog, screen asleep, storage under 5%', 'HCI Support after 2 checks in a row (about 1 min).'],
       ['check', 'Problem clears', 'All clear to everyone who was told.'],
-      ['plug', 'New device answers on 5555' + (c.sweepMinutes > 0 ? ' (sweep every ' + c.sweepMinutes + ' min)' : ' (sweep is off)'), 'HCI Support. It waits until someone claims it.']
+      ['plug', 'New device answers on 5555 (cameras on 65037)' + (c.sweepMinutes > 0 ? ' (sweep every ' + c.sweepMinutes + ' min)' : ' (sweep is off)'), 'HCI Support. It waits until someone claims it.']
     ];
   }
   function onTick(devs) {
@@ -1066,7 +1078,7 @@ module.exports = function createHealth(ctx) {
         h.reachAt = t;
         probeKind(b.host, b.port, 2000).then(k => {
           h.reach = k.kind; h.connectMs = k.kind === 'open' || k.kind === 'refused' ? k.ms : null;
-          // port 5555 answers again: reconnect now rather than wait for the slower retry of a board that was down a while
+          // the ADB port answers again: reconnect now rather than wait for the slower retry of a board that was down a while
           if (k.kind === 'open' && R(b).status === 'unreachable' && !R(b).connecting && monitored(b)) ctx.connect(b).catch(() => {});
         });
       }

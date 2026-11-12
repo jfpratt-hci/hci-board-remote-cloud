@@ -42,7 +42,8 @@ Device health   Heartbeat wall, where each board breaks, first read, Claude,
                 Camera, LED ring and Crash views, a time range, a level filter
                 and search), Save snapshot, and, on door signs, LED bezel
                 control: pick Solid or Flash, then a colour, to set the ring.
-New devices     Anything answering ADB on 5555 or USB. Claim it in two taps.
+New devices     Anything answering ADB on 5555, cameras on 65037, or USB.
+                Claim it in two taps.
                 A device drops off this list as soon as it is added as a
                 board, whether you claim it here or just type its IP on Boards.
 Deploy          Room list import, app push and rooms in MediaCare (below).
@@ -112,7 +113,11 @@ Clock, app, crash, screen, storage problems: HCI Support
 Fixed                         all clear to everyone who was told
 
 ON EACH BOARD
-USB debugging on and network ADB on 5555. Install the HCI ONE ADB keeper so
+USB debugging on and network ADB on 5555. Cameras only work on 65037; every
+scan tries 5555 first, then 65037 for addresses that did not answer, and a
+board saved on 5555 that stops answering is retried on 65037 and moved there.
+Cameras keep 65037 on their own, so they never get the keeper.
+For boards, install the HCI ONE ADB keeper so
 network ADB survives reboots: it is already in the Deploy app library (push
 it to every board), and a claim installs it too. Use DHCP reservations.
 

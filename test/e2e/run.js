@@ -162,6 +162,18 @@ const req = (base, method, p, body, headers) => new Promise((resolve, reject) =>
     console.log('    IT sees Hospitals tab:', await it.evaluate(() => !document.querySelector('#navHci').hidden));
     await br.close();
   }
+  // a camera only listens on 65037: saved as 5555, Board Remote tries 5555 first, then moves it to 65037
+  require('net').createServer(x => x.end()).listen(65037, '127.0.0.6');
+  fs.appendFileSync(path.join(HERE, 'stB', 'boards.cfg'), '127.0.0.6 device\n');
+  const cam = (await L(B, 'POST', '/api/boards', { name: 'CAM 403', host: '127.0.0.6', port: 5555, kind: 'cam', room: '403', unit: '4 West', closet: 'IDF 4' })).json;
+  T('a camera can be added on the default port', cam && cam.ok, cam);
+  const camB = await until(async () => { const b = (await boardsOf(B)).find(x => x.host === '127.0.0.6'); return b && b.port === 65037 && b.status === 'online' ? b : null; }, 20000);
+  T('a camera that does not answer on 5555 is found on 65037, saved there and online', !!camB, (await boardsOf(B)).find(x => x.host === '127.0.0.6'));
+  const camDupe = (await L(B, 'POST', '/api/boards', { name: 'CAM again', host: '127.0.0.6', port: 65037, kind: 'cam' })).json;
+  T('the same camera cannot be added twice on 65037', camDupe && !camDupe.ok, camDupe);
+  const wbStill = (await boardsOf(B)).filter(x => x.host === '127.0.0.2' || x.host === '127.0.0.3');
+  T('boards on 5555 stay on 5555', wbStill.length === 2 && wbStill.every(x => x.port === 5555), wbStill.map(x => x.port));
+
   B.proc.kill();
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   await new Promise(r => app.server.close(r)); await db.pool.end();

@@ -850,7 +850,7 @@ function renderSide() {
 /* ---------- new devices view ---------- */
 var VIA = { network: ['Network sweep', 'wifi'], usb: ['USB', 'usb'], adb: ['Already connected', 'link'] };
 function fLabel(e) { return e.model ? [e.make, e.model].filter(Boolean).join(' ') : e.via === 'usb' ? 'Device on USB' : 'Android device'; }
-function fWhere(e) { return e.via === 'usb' ? 'USB · ' + (e.serial || '') : e.host + ':' + e.port; }
+function fWhere(e) { return e.via === 'usb' ? 'USB · ' + (e.serial || '') : e.host + ':' + e.port + (e.port === 65037 ? ' · camera' : ''); }
 function ndCard(e) {
   var lab = { found: 'Waiting for claim', claiming: 'Claiming', claimed: 'Claimed', ignored: 'Hidden' }[e.status] || e.status;
   var sv = e.status === 'claimed' ? 'fixed' : e.status === 'claiming' ? 'boot' : e.status === 'ignored' ? 'gone' : 'new';
@@ -864,7 +864,7 @@ function renderNew() {
   var hid = D.found.filter(function (e) { return e.status === 'ignored'; });
   if (!S.nd || !D.found.some(function (e) { return e.id === S.nd; })) S.nd = (open[0] || done[0] || {}).id || null;
   html('ndCount', open.length + ' waiting');
-  html('ndList', open.length ? open.map(ndCard).join('') : '<p class="note">Nothing waiting. Plug a board into this PC by USB, or power one up on the network with ADB on port 5555, and it shows up here.</p>');
+  html('ndList', open.length ? open.map(ndCard).join('') : '<p class="note">Nothing waiting. Plug a board into this PC by USB, or power one up on the network with ADB on port 5555 (cameras on 65037), and it shows up here.</p>');
   html('ndDone', done.length ? done.map(ndCard).join('') : '<p class="note">Nothing claimed yet.</p>');
   $('btnHidden').hidden = !hid.length; $('btnHidden').textContent = (S.showHidden ? 'Hide' : 'Show') + ' ' + hid.length + ' hidden';
   $('ndHidden').hidden = !S.showHidden; html('ndHidden', hid.map(ndCard).join(''));
@@ -872,15 +872,15 @@ function renderNew() {
   html('sweepNote', D.sweeping ? 'Looking now…' : (D.lastSweep ? 'Last look ' + dur(D.now - D.lastSweep) + ' ago. ' : '') + (D.settings.sweepMinutes > 0 ? 'Every ' + D.settings.sweepMinutes + ' min.' : 'Automatic look is off.'));
   renderNdDetail();
   html('howList', [
-    ['Look on the network', 'Every few minutes Board Remote checks this PC’s networks for anything answering ADB on port 5555. A board on USB, or one another tool already connected, shows up right away.'],
+    ['Look on the network', 'Every few minutes Board Remote checks this PC’s networks for anything answering ADB on port 5555, then checks camera port 65037 on every address that did not answer. A board on USB, or one another tool already connected, shows up right away.'],
     ['Ask the person at the board', 'Claiming connects to it. The board shows Allow USB debugging with this PC’s fingerprint. Nothing happens until someone there taps Allow.'],
     ['Learn who it is', 'Model, serial, Android version and MAC come from the board itself.'],
-    ['Set it up', 'Board Remote installs the HCI ONE ADB keeper so network ADB survives reboots, checks the clock and notes the app on screen.'],
+    ['Set it up', 'Board Remote installs the HCI ONE ADB keeper so network ADB survives reboots (cameras keep 65037 on their own and are left alone), checks the clock and notes the app on screen.'],
     ['Watch it', 'It joins the heartbeat wall in its room and closet, or takes over the record of the board it replaces.']
   ].map(function (s, i) { return '<div class="rule"><span class="ri">' + (i + 1) + '</span><span class="if">' + s[0] + '</span><span class="then">' + s[1] + '</span></div>'; }).join(''));
   html('itList', [
     ['server', 'A fixed address for each board', 'A DHCP reservation, so a board never moves to a new address.'],
-    ['link', 'Port 5555 open from this PC', 'Only from this PC to the device network. Nothing else needs it.'],
+    ['link', 'Ports 5555 and 65037 open from this PC', 'Only from this PC to the device network. Nothing else needs it.'],
     ['clock', 'A time server the boards can reach', 'NTP (UDP 123). Without it clocks drift and sign ins fail.'],
     ['map', 'Units, closets and rooms', 'Enter them when you claim a board so a closet outage shows as one alert.']
   ].map(function (s) { return '<div class="rule"><span class="ri">' + ic(s[0]) + '</span><span class="if">' + s[1] + '</span><span class="then">' + s[2] + '</span></div>'; }).join(''));
@@ -923,7 +923,7 @@ function renderNdDetail() {
   if (e.error) h += '<div class="badbox">Last try stopped: ' + esc(e.error) + '</div>';
   var fp = D.fingerprint;
   h += '<div class="claimgrid"><div class="sect"><span class="eyebrow">What the person at the board sees</span><div class="phone"><div class="ascr"><div class="adlg"><b>Allow USB debugging?</b><span>The computer’s RSA key fingerprint is:</span><code>' + esc(fp || 'shown on the board') + '</code><span class="ck"><i></i>Always allow from this computer</span><span class="bt"><span>Cancel</span><span>Allow</span></span></div></div></div><p class="note">' + (fp ? 'Ask them to check the fingerprint matches, tick Always allow, then tap Allow.' : 'Ask them to tick Always allow, then tap Allow.') + '</p></div>';
-  var F = S.form && S.form.id === e.id ? S.form : (S.form = { id: e.id, mode: 'add', name: '', kind: 'wb', unit: '', closet: '', room: '', app: '', replaceId: '' });
+  var F = S.form && S.form.id === e.id ? S.form : (S.form = { id: e.id, mode: 'add', name: '', kind: e.camera || e.port === 65037 ? 'cam' : 'wb', unit: '', closet: '', room: '', app: '', replaceId: '' });
   var candidates = D.boards.filter(function (b) { return b.health.state === 'offline' || b.health.state === 'degraded' || b.health.state === 'late'; }).concat(D.boards.filter(function (b) { return !(b.health.state === 'offline' || b.health.state === 'degraded' || b.health.state === 'late'); }));
   h += '<div class="sect"><span class="eyebrow">Place it</span><div class="sugg">'
     + '<div class="radio"><label><input type="radio" name="ndMode" value="add"' + (F.mode === 'add' ? ' checked' : '') + '><span>Add as a new board<small>It joins the wall in the room you pick.</small></span></label>'

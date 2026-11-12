@@ -16,7 +16,7 @@ const net = require('net');
 const crypto = require('crypto');
 const { execFile, spawn } = require('child_process');
 
-const VERSION = '2.1.0';
+const VERSION = '2.1.1';
 /* APP holds the program (replaced by updates); ROOT holds this PC's data (boards, health, audit,
    snapshots, tools). They are the same folder unless the Windows service sets BR_DATA_DIR. */
 const APP = __dirname;
@@ -166,6 +166,11 @@ async function listDevices() {
 }
 const isUsbSerial = s => !/:\d+$/.test(s) && !/^emulator/.test(s) && !/_adb-tls/.test(s);
 
+/* ADB ports, in the order they are tried. Boards and TVs use 5555. HCI ONE cameras only
+   listen on 65037, so a host that does not answer on 5555 gets a second look there. */
+const ADB_PORT = 5555, CAMERA_PORT = 65037;
+const ADB_PORTS = [ADB_PORT, CAMERA_PORT];
+const portLabel = port => port === CAMERA_PORT ? 'camera port ' + port : 'port ' + port;
 function probe(host, port, ms) {
   return new Promise(resolve => {
     let done = false;
@@ -222,10 +227,10 @@ async function doConnect(b) {
   r.connecting = true;
   await connectSlot();
   try {
-    if (!(await probe(b.host, b.port, 1500))) {
+    if (!(await probe(b.host, b.port, 1500)) && !(await tryOtherPort(b))) {
       if (r.status !== 'unreachable' || !r.downAt) r.downAt = Date.now();
       r.status = 'unreachable';
-      r.error = 'No answer on ' + serialOf(b) + '. The board is off, off the network, or ADB over network is not on.';
+      r.error = 'No answer on ' + serialOf(b) + (ADB_PORTS.indexOf(b.port) >= 0 ? ' or ' + ADB_PORTS.filter(x => x !== b.port).map(portLabel).join(' or ') : '') + '. The device is off, off the network, or ADB over network is not on.';
       return r;
     }
     if (r.status !== 'online') r.status = 'connecting';
@@ -242,6 +247,24 @@ async function doConnect(b) {
     connectDone();
   }
   return r;
+}
+
+// The saved port did not answer. Try the other ADB ports in order (5555, then 65037); if one
+// answers, the board moves to it so every later connect, heartbeat and live view uses it.
+async function tryOtherPort(b) {
+  if (ADB_PORTS.indexOf(b.port) < 0) return false;           // a port someone typed on purpose stays put
+  for (const port of ADB_PORTS) {
+    if (port === b.port) continue;
+    if (store.boards.some(x => x.id !== b.id && x.host === b.host && x.port === port)) continue;
+    if (!(await probe(b.host, port, 1500))) continue;
+    const was = b.port;
+    stopLive(b.id, 'Moved to port ' + port);
+    b.port = port;
+    saveStore();
+    log(b.name + ' did not answer on ' + was + ' but answers on ' + port + '. Saved ' + b.host + ':' + port + '.');
+    return true;
+  }
+  return false;
 }
 
 async function keep(b, d) {
@@ -489,6 +512,17 @@ async function install(b, req) {
   }
 }
 
+// Which network port a device on USB should be reached on. 5555 if it already answers there;
+// 65037 if it is a camera already listening there (cameras only work on 65037, so never
+// switch them); otherwise turn on network ADB on 5555.
+async function usbNetPort(serial, ip) {
+  if (await probe(ip, ADB_PORT, 1200)) return ADB_PORT;
+  if (await probe(ip, CAMERA_PORT, 1200)) return CAMERA_PORT;
+  await adb(['-s', serial, 'tcpip', String(ADB_PORT)], { timeout: 12000 });
+  await sleep(2500);
+  return ADB_PORT;
+}
+
 async function usbToWifi() {
   const devs = await listDevices();
   if (!devs) return { ok: false, message: 'adb is not responding.' };
@@ -504,10 +538,10 @@ async function usbToWifi() {
     String(ipr.out || '').replace(/inet (\d+\.\d+\.\d+\.\d+)\//g, (m, ip) => { if (!/^127\.|^169\.254\./.test(ip)) ips.push(ip); return m; });
     if (!ips.length) { lines.push(s + ': the board has no network address yet.'); continue; }
     const model = String(devs[s].model || 'Board').replace(/_/g, ' ');
-    await adb(['-s', s, 'tcpip', '5555'], { timeout: 12000 });
-    let b = store.boards.find(x => x.host === ips[0] && x.port === 5555);
+    const port = await usbNetPort(s, ips[0]);
+    let b = store.boards.find(x => x.host === ips[0] && x.port === port);
     if (!b) {
-      b = normBoard({ name: model + ' ' + ips[0].split('.').pop(), host: ips[0], port: 5555 });
+      b = normBoard({ name: model + ' ' + ips[0].split('.').pop(), host: ips[0], port });
       store.boards.push(b);
       saveStore();
     }
@@ -515,7 +549,7 @@ async function usbToWifi() {
     await sleep(2500);
     await connect(b);
     any = true;
-    lines.push(b.name + ' is on ' + ips[0] + ':5555. You can unplug the cable.');
+    lines.push(b.name + ' is on ' + ips[0] + ':' + port + (port === CAMERA_PORT ? ' (camera)' : '') + '. You can unplug the cable.');
   }
   return { ok: any, message: lines.join('\n') };
 }
@@ -543,8 +577,8 @@ function scanTargets() {
   }
   return targets;
 }
-async function scanHosts(port) {
-  const targets = scanTargets();
+async function scanHosts(port, list) {
+  const targets = list || scanTargets();
   const found = [];
   let i = 0;
   const worker = async () => { while (i < targets.length) { const t = targets[i++]; if (await probe(t, port, 450)) found.push(t); } };
@@ -552,15 +586,32 @@ async function scanHosts(port) {
   found.sort((a, b) => ipToInt(a) - ipToInt(b));
   return found;
 }
+// Sweep 5555 first, then 65037 only for the addresses that did not answer on 5555.
+// Returns [{ host, port }] sorted by address.
+async function scanAdb(list) {
+  const targets = list || scanTargets();
+  const out = [];
+  let left = targets;
+  for (const port of ADB_PORTS) {
+    if (!left.length) break;
+    const hits = await scanHosts(port, left);
+    const hit = new Set(hits);
+    hits.forEach(host => out.push({ host, port }));
+    left = left.filter(t => !hit.has(t));
+  }
+  out.sort((a, b) => ipToInt(a.host) - ipToInt(b.host));
+  return out;
+}
 async function scan(port) {
   const targets = scanTargets();
-  const found = await scanHosts(port);
+  const found = port ? (await scanHosts(port, targets)).map(host => ({ host, port })) : await scanAdb(targets);
   return {
     ok: true,
     scanned: targets.length,
-    found: found.map(h => {
-      const b = store.boards.find(x => x.host === h && x.port === port);
-      return { host: h, port, known: !!b, name: b ? b.name : '' };
+    ports: port ? [port] : ADB_PORTS,
+    found: found.map(f => {
+      const b = store.boards.find(x => x.host === f.host && x.port === f.port);
+      return { host: f.host, port: f.port, camera: f.port === CAMERA_PORT, known: !!b, name: b ? b.name : '' };
     })
   };
 }
@@ -1008,7 +1059,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/scan') {
       const body = await readJson(req);
-      return send(res, 200, await scan(Number(body.port) || 5555));
+      return send(res, 200, await scan(Number(body.port) || 0));   // no port: 5555, then 65037
     }
     if (p === '/api/usbwifi') return send(res, 200, await usbToWifi());
     if (p === '/api/snap') {
@@ -1164,7 +1215,7 @@ const server = http.createServer(async (req, res) => {
 loadStore();
 health = require('./health')({
   store, saveStore, R, serialOf, adb, shell, log, ROOT, APP, IS_WIN, send, readJson, publicBoard, normBoard,
-  connect, listDevices, scanHosts, isUsbSerial, stopLive
+  connect, listDevices, scanHosts, scanAdb, usbNetPort, ADB_PORTS, CAMERA_PORT, isUsbSerial, stopLive
 });
 deploy = require('./deploy')({ store, saveStore, R, serialOf, adb, shell, log, ROOT, APP, send, readJson, normBoard, connect, resetInfo, health });
 logs = require('./logs')({ store, saveStore, R, serialOf, adb, log, ROOT, send, readJson });

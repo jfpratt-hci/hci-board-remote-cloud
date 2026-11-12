@@ -302,7 +302,7 @@ dialog h2{margin:0 0 16px;font-size:20px;font-weight:800}
     <div class="fields">
       <label class="field full"><span class="label">Name</span><input type="text" id="fName" placeholder="Room 412 whiteboard" maxlength="60"></label>
       <label class="field"><span class="label">IP address</span><input type="text" id="fHost" placeholder="192.168.4.31" autocomplete="off" spellcheck="false"></label>
-      <label class="field"><span class="label">Port</span><input type="number" id="fPort" value="5555" min="1" max="65535"></label>
+      <label class="field"><span class="label">Port</span><input type="number" id="fPort" value="5555" min="1" max="65535" title="5555 for boards and TVs. Cameras use 65037. If 5555 does not answer, Board Remote tries 65037 on its own."></label>
       <label class="field"><span class="label">Type</span><select id="fKind" class="sel"><option value="wb">Whiteboard</option><option value="ds">Door sign</option><option value="tv">Patient TV</option><option value="cam">Camera</option><option value="tab">Tablet</option><option value="usb">Unit Status Board</option></select></label>
       <label class="field"><span class="label">Room</span><input type="text" id="fRoom" maxlength="20" placeholder="412"></label>
       <label class="field"><span class="label">Unit</span><input type="text" id="fUnit" maxlength="40" placeholder="4 West"></label>
@@ -598,7 +598,7 @@ $('#q').onkeydown = e => { if (e.key === 'Escape') setFilter(showSel, ''); };
 
 function emptyHtml() {
   return '<section class="empty"><div><div class="label">Get started</div><h2>Add your first board</h2>' +
-    '<p>Each board needs ADB over the network turned on (port 5555). Pick whichever way is easiest.</p></div>' +
+    '<p>Each board needs ADB over the network turned on (port 5555; cameras use 65037). Pick whichever way is easiest.</p></div>' +
     '<div class="ways">' +
     '<div class="way"><h3>Find boards</h3><p class="muted">Looks across this network for anything with ADB open and lets you add it with one click.</p><button class="btn dark" data-empty="scan">Find boards</button></div>' +
     '<div class="way"><h3>USB to WiFi</h3><p class="muted">Plug a board into this PC once with a USB cable. This switches it to network ADB and adds it.</p><button class="btn" data-empty="usb">USB to WiFi</button></div>' +
@@ -925,11 +925,13 @@ async function removeBoard(id) {
 
 /* ---------- scan ---------- */
 let lastFound = [];
+// Anything that only answered on 65037 is a camera, so it is added as one.
+const foundBoard = f => Object.assign({ name: (f.camera ? 'Camera ' : 'Board ') + f.host.split('.').pop(), host: f.host, port: f.port }, f.camera ? { kind: 'cam' } : {});
 async function openScan() {
   if (!$('#dlgScan').open) $('#dlgScan').showModal();
   $('#scanAddAll').hidden = true;
-  $('#scanBody').innerHTML = '<p class="muted">Checking every address on this network for ADB on port 5555. This takes a few seconds.</p><div class="spin"></div>';
-  const j = await api('/api/scan', { port: 5555 });
+  $('#scanBody').innerHTML = '<p class="muted">Checking every address on this network for ADB on port 5555, then camera port 65037 for anything that did not answer. This takes a few seconds.</p><div class="spin"></div>';
+  const j = await api('/api/scan', {});
   if (!j.ok) { $('#scanBody').innerHTML = ''; $('#scanBody').append(j.message || 'Scan failed.'); return; }
   lastFound = j.found;
   const fresh = j.found.filter(f => !f.known);
@@ -938,18 +940,18 @@ async function openScan() {
   p.className = 'muted';
   p.textContent = j.found.length
     ? 'Found ' + j.found.length + ' device' + (j.found.length === 1 ? '' : 's') + ' with ADB open (' + j.scanned + ' addresses checked). Rename them after adding.'
-    : 'Nothing answered on port 5555 (' + j.scanned + ' addresses checked). Make sure network ADB is on, or use USB to WiFi.';
+    : 'Nothing answered on port 5555 or camera port 65037 (' + j.scanned + ' addresses checked). Make sure network ADB is on, or use USB to WiFi.';
   box.appendChild(p);
   const list = document.createElement('div'); list.className = 'found';
   j.found.forEach(f => {
     const row = document.createElement('div'); row.className = 'fr';
     const left = document.createElement('div');
-    const ip = document.createElement('div'); ip.className = 'ip'; ip.textContent = f.host;
+    const ip = document.createElement('div'); ip.className = 'ip'; ip.textContent = f.host + (f.port !== 5555 ? ':' + f.port : '') + (f.camera ? ' · camera' : '');
     const k = document.createElement('div'); k.className = 'k'; k.textContent = f.known ? 'Already added as ' + f.name : 'New';
     left.append(ip, k); row.appendChild(left);
     if (!f.known) {
       const add = document.createElement('button'); add.className = 'btn dark'; add.textContent = 'Add';
-      add.onclick = async () => { add.disabled = true; const r = await api('/api/boards', { name: 'Board ' + f.host.split('.').pop(), host: f.host, port: f.port }); report(r); if (r.ok) { f.known = true; k.textContent = 'Added'; add.remove(); } else add.disabled = false; poll(); };
+      add.onclick = async () => { add.disabled = true; const r = await api('/api/boards', foundBoard(f)); report(r); if (r.ok) { f.known = true; k.textContent = 'Added'; add.remove(); } else add.disabled = false; poll(); };
       row.appendChild(add);
     }
     list.appendChild(row);
@@ -960,8 +962,13 @@ async function openScan() {
 }
 $('#scanAgain').onclick = openScan;
 $('#scanClose').onclick = () => $('#dlgScan').close();
+$('#fKind').addEventListener('change', () => {
+  const k = $('#fKind').value, port = $('#fPort');
+  if (k === 'cam' && port.value === '5555') port.value = '65037';
+  else if (k !== 'cam' && port.value === '65037') port.value = '5555';
+});
 $('#scanAddAll').onclick = async () => {
-  for (const f of lastFound.filter(x => !x.known)) await api('/api/boards', { name: 'Board ' + f.host.split('.').pop(), host: f.host, port: f.port });
+  for (const f of lastFound.filter(x => !x.known)) await api('/api/boards', foundBoard(f));
   $('#dlgScan').close(); toast('Added. Click a name to rename it.'); poll();
 };
 
